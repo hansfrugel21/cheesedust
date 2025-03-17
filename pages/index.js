@@ -12,12 +12,14 @@ export default function Home() {
   const [pick, setPick] = useState("");
   const [picksTable, setPicksTable] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false); // Preview picks before games start
+  const [previewMode, setPreviewMode] = useState(false); 
 
   useEffect(() => {
-    fetchExistingUsers();
-    fetchSubmittedPicks();
-    checkGameStatus();
+    if (typeof window !== "undefined") {
+      fetchExistingUsers();
+      fetchSubmittedPicks();
+      checkGameStatus();
+    }
   }, []);
 
   useEffect(() => {
@@ -27,7 +29,8 @@ export default function Home() {
   }, [tournamentDay, isLoggedIn]);
 
   const checkGameStatus = () => {
-    const firstGameTime = new Date("2025-03-19T12:00:00"); // Adjust to actual start time
+    if (typeof window === "undefined") return;
+    const firstGameTime = new Date("2025-03-19T12:00:00"); 
     const currentTime = new Date();
     setGameStarted(currentTime >= firstGameTime);
   };
@@ -83,7 +86,6 @@ export default function Home() {
       return;
     }
 
-    // Keep only the latest pick per user per tournament day
     const latestPicks = {};
     data.forEach((entry) => {
       const key = `${entry.username}-${entry.tournament_day}`;
@@ -101,7 +103,7 @@ export default function Home() {
       return;
     }
 
-    const { data: existingUser, error: userError } = await supabase
+    const { data: existingUser } = await supabase
       .from("users")
       .select("username")
       .eq("username", username)
@@ -147,57 +149,6 @@ export default function Home() {
     fetchSubmittedPicks();
   };
 
-  const submitPick = async () => {
-    if (!pick || !tournamentDay) {
-      alert("Please select a team and a day.");
-      return;
-    }
-
-    if (gameStarted) {
-      alert("Picks are locked! You cannot change your selection now.");
-      return;
-    }
-
-    const { data: teamData, error: teamError } = await supabase
-      .from("teams")
-      .select("id, team_name")
-      .eq("id", pick)
-      .single();
-
-    if (teamError || !teamData) {
-      console.error("Error fetching team info:", teamError);
-      alert("Invalid team selection.");
-      return;
-    }
-
-    const { data: existingPick } = await supabase
-      .from("picks")
-      .select("id")
-      .eq("user_id", currentUser.id)
-      .eq("tournament_day", tournamentDay)
-      .single();
-
-    if (existingPick) {
-      await supabase.from("picks").update({
-        team: teamData.team_name,
-        date: new Date().toISOString(),
-      }).eq("id", existingPick.id);
-    } else {
-      await supabase.from("picks").insert([
-        {
-          user_id: currentUser.id,
-          username: currentUser.username,
-          team: teamData.team_name,
-          tournament_day: parseInt(tournamentDay, 10),
-          date: new Date().toISOString(),
-        },
-      ]);
-    }
-
-    alert(`Pick for Day ${tournamentDay} submitted successfully!`);
-    fetchSubmittedPicks();
-  };
-
   const handleLogout = () => {
     setCurrentUser(null);
     setIsLoggedIn(false);
@@ -229,12 +180,22 @@ export default function Home() {
       ) : (
         <div>
           <h2>Submitted Picks</h2>
+          <ul>
+            {picksTable.map((entry, index) => (
+              <li key={index}>
+                {entry.username} - {entry.tournament_day} - {(gameStarted || previewMode) ? entry.team : "Submitted"}
+              </li>
+            ))}
+          </ul>
           <button onClick={() => setPreviewMode(!previewMode)}>
             {previewMode ? "Hide Preview" : "Preview Picks"}
           </button>
+
+          <button onClick={handleLogout}>Logout</button>
         </div>
       )}
     </div>
   );
 }
+
 
