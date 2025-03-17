@@ -12,6 +12,7 @@ export default function Home() {
   const [pick, setPick] = useState("");
   const [picksTable, setPicksTable] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false); // New state for pick preview mode
 
   useEffect(() => {
     fetchExistingUsers();
@@ -91,7 +92,6 @@ export default function Home() {
       return;
     }
 
-    // Check if username already exists
     const { data: existingUser, error: userError } = await supabase
       .from("users")
       .select("username")
@@ -103,12 +103,7 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase.from("users").insert([
-      {
-        username: username,
-        email: email,
-      },
-    ]);
+    const { error } = await supabase.from("users").insert([{ username, email }]);
 
     if (error) {
       console.error("Error signing up:", error);
@@ -166,7 +161,6 @@ export default function Home() {
       return;
     }
 
-    // Check if the user already made a pick for this day
     const { data: existingPick, error: checkError } = await supabase
       .from("picks")
       .select("id")
@@ -174,14 +168,7 @@ export default function Home() {
       .eq("tournament_day", tournamentDay)
       .single();
 
-    if (checkError && checkError.code !== "PGRST116") {
-      console.error("Error checking existing pick:", checkError);
-      alert("Error verifying existing pick.");
-      return;
-    }
-
     if (existingPick) {
-      // Overwrite the previous pick
       const { error: updateError } = await supabase
         .from("picks")
         .update({
@@ -196,7 +183,6 @@ export default function Home() {
         return;
       }
     } else {
-      // Insert a new pick
       const { error: insertError } = await supabase.from("picks").insert([
         {
           user_id: currentUser.id,
@@ -251,11 +237,19 @@ export default function Home() {
           <h2>Welcome, {currentUser.username}!</h2>
           <button onClick={handleLogout}>Logout</button>
 
-          <h2>Pick Submission Locked: {gameStarted ? "Yes" : "No"}</h2>
-          <button onClick={submitPick} disabled={gameStarted}>Submit Pick</button>
+          <h2>Submitted Picks</h2>
+          <ul>
+            {picksTable.map((entry, index) => (
+              <li key={index}>
+                {entry.username} - {entry.tournament_day} - {(gameStarted || previewMode) ? entry.team : "Submitted"}
+              </li>
+            ))}
+          </ul>
+          <button onClick={() => setPreviewMode(!previewMode)}>
+            {previewMode ? "Hide Preview" : "Preview Picks"}
+          </button>
         </div>
       )}
     </div>
   );
 }
-
