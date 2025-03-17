@@ -12,7 +12,7 @@ export default function Home() {
   const [pick, setPick] = useState("");
   const [picksTable, setPicksTable] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false); // New state for pick preview mode
+  const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
     fetchExistingUsers();
@@ -76,14 +76,14 @@ export default function Home() {
     const { data, error } = await supabase
       .from("picks")
       .select("username, tournament_day, team, date")
-      .order("date", { ascending: false }); // Sort by most recent first
+      .order("date", { ascending: false });
 
     if (error) {
       console.error("Error fetching submitted picks:", error);
       return;
     }
 
-    // Use a map to keep only the latest pick per user per tournament day
+    // Keep only the latest pick per user per tournament day
     const latestPicks = {};
     data.forEach((entry) => {
       const key = `${entry.username}-${entry.tournament_day}`;
@@ -170,7 +170,7 @@ export default function Home() {
       return;
     }
 
-    const { data: existingPick, error: checkError } = await supabase
+    const { data: existingPick } = await supabase
       .from("picks")
       .select("id")
       .eq("user_id", currentUser.id)
@@ -178,21 +178,12 @@ export default function Home() {
       .single();
 
     if (existingPick) {
-      const { error: updateError } = await supabase
-        .from("picks")
-        .update({
-          team: teamData.team_name,
-          date: new Date().toISOString(),
-        })
-        .eq("id", existingPick.id);
-
-      if (updateError) {
-        console.error("Error updating pick:", updateError);
-        alert("Failed to update pick.");
-        return;
-      }
+      await supabase.from("picks").update({
+        team: teamData.team_name,
+        date: new Date().toISOString(),
+      }).eq("id", existingPick.id);
     } else {
-      const { error: insertError } = await supabase.from("picks").insert([
+      await supabase.from("picks").insert([
         {
           user_id: currentUser.id,
           username: currentUser.username,
@@ -201,12 +192,6 @@ export default function Home() {
           date: new Date().toISOString(),
         },
       ]);
-
-      if (insertError) {
-        console.error("Error submitting pick:", insertError);
-        alert("Failed to submit pick.");
-        return;
-      }
     }
 
     alert(`Pick for Day ${tournamentDay} submitted successfully!`);
@@ -243,19 +228,23 @@ export default function Home() {
         </div>
       ) : (
         <div>
-          <h2>Submitted Picks</h2>
-          <ul>
-            {picksTable.map((entry, index) => (
-              <li key={index}>
-                {entry.username} - {entry.tournament_day} - {(gameStarted || previewMode) ? entry.team : "Submitted"}
-              </li>
+          <h2>Pick a Team for a Tournament Day</h2>
+          <select onChange={(e) => setTournamentDay(e.target.value)}>
+            <option value="">Select a day</option>
+            {[...Array(10)].map((_, i) => <option key={i + 1} value={i + 1}>Day {i + 1}</option>)}
+          </select>
+          <select onChange={(e) => setPick(e.target.value)}>
+            <option value="">Select a team</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.team_name}
+              </option>
             ))}
-          </ul>
-          <button onClick={() => setPreviewMode(!previewMode)}>
-            {previewMode ? "Hide Preview" : "Preview Picks"}
-          </button>
+          </select>
+          <button onClick={submitPick}>Submit Pick</button>
         </div>
       )}
     </div>
   );
 }
+
