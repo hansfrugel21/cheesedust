@@ -76,14 +76,23 @@ export default function Home() {
     const { data, error } = await supabase
       .from("picks")
       .select("username, tournament_day, team, date")
-      .order("date", { ascending: false });
+      .order("date", { ascending: false }); // Sort by most recent first
 
     if (error) {
       console.error("Error fetching submitted picks:", error);
       return;
     }
 
-    setPicksTable(data);
+    // Use a map to keep only the latest pick per user per tournament day
+    const latestPicks = {};
+    data.forEach((entry) => {
+      const key = `${entry.username}-${entry.tournament_day}`;
+      if (!latestPicks[key]) {
+        latestPicks[key] = entry;
+      }
+    });
+
+    setPicksTable(Object.values(latestPicks));
   };
 
   const handleSignUp = async () => {
@@ -234,9 +243,6 @@ export default function Home() {
         </div>
       ) : (
         <div>
-          <h2>Welcome, {currentUser.username}!</h2>
-          <button onClick={handleLogout}>Logout</button>
-
           <h2>Submitted Picks</h2>
           <ul>
             {picksTable.map((entry, index) => (
