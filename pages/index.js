@@ -26,7 +26,7 @@ export default function Home() {
   }, [tournamentDay, isLoggedIn]);
 
   const checkGameStatus = () => {
-    const firstGameTime = new Date("2025-03-19T12:00:00"); // Adjust this to the real start time
+    const firstGameTime = new Date("2025-03-19T12:00:00"); // Adjust to actual start time
     const currentTime = new Date();
     setGameStarted(currentTime >= firstGameTime);
   };
@@ -91,6 +91,18 @@ export default function Home() {
       return;
     }
 
+    // Check if username already exists
+    const { data: existingUser, error: userError } = await supabase
+      .from("users")
+      .select("username")
+      .eq("username", username)
+      .single();
+
+    if (existingUser) {
+      alert("This username is already taken. Please choose a different one.");
+      return;
+    }
+
     const { error } = await supabase.from("users").insert([
       {
         username: username,
@@ -137,6 +149,11 @@ export default function Home() {
       return;
     }
 
+    if (gameStarted) {
+      alert("Picks are locked! You cannot change your selection now.");
+      return;
+    }
+
     const { data: teamData, error: teamError } = await supabase
       .from("teams")
       .select("id, team_name")
@@ -149,20 +166,52 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase.from("picks").insert([
-      {
-        user_id: currentUser.id,
-        username: currentUser.username,
-        team: teamData.team_name, 
-        tournament_day: parseInt(tournamentDay, 10),
-        date: new Date().toISOString(), 
-      },
-    ]);
+    // Check if the user already made a pick for this day
+    const { data: existingPick, error: checkError } = await supabase
+      .from("picks")
+      .select("id")
+      .eq("user_id", currentUser.id)
+      .eq("tournament_day", tournamentDay)
+      .single();
 
-    if (error) {
-      console.error("Error submitting pick:", error);
-      alert("Failed to submit pick.");
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking existing pick:", checkError);
+      alert("Error verifying existing pick.");
       return;
+    }
+
+    if (existingPick) {
+      // Overwrite the previous pick
+      const { error: updateError } = await supabase
+        .from("picks")
+        .update({
+          team: teamData.team_name,
+          date: new Date().toISOString(),
+        })
+        .eq("id", existingPick.id);
+
+      if (updateError) {
+        console.error("Error updating pick:", updateError);
+        alert("Failed to update pick.");
+        return;
+      }
+    } else {
+      // Insert a new pick
+      const { error: insertError } = await supabase.from("picks").insert([
+        {
+          user_id: currentUser.id,
+          username: currentUser.username,
+          team: teamData.team_name,
+          tournament_day: parseInt(tournamentDay, 10),
+          date: new Date().toISOString(),
+        },
+      ]);
+
+      if (insertError) {
+        console.error("Error submitting pick:", insertError);
+        alert("Failed to submit pick.");
+        return;
+      }
     }
 
     alert(`Pick for Day ${tournamentDay} submitted successfully!`);
@@ -202,33 +251,11 @@ export default function Home() {
           <h2>Welcome, {currentUser.username}!</h2>
           <button onClick={handleLogout}>Logout</button>
 
-          <h2>Pick a Team for a Tournament Day</h2>
-          <select onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
-            <option value="">Select a day</option>
-            {[...Array(10)].map((_, i) => <option key={i + 1} value={i + 1}>Day {i + 1}</option>)}
-          </select>
-
-          <select onChange={(e) => setPick(e.target.value)} value={pick}>
-            <option value="">Select a team</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.team_name} (Seed {team.seed}, AP Rank {team.ap_rank})
-              </option>
-            ))}
-          </select>
-
-          <button onClick={submitPick}>Submit Pick</button>
-
-          <h2>Submitted Picks</h2>
-          <ul>
-            {picksTable.map((entry, index) => (
-              <li key={index}>
-                {entry.username} - {entry.tournament_day} - {gameStarted ? entry.team : "Submitted"}
-              </li>
-            ))}
-          </ul>
+          <h2>Pick Submission Locked: {gameStarted ? "Yes" : "No"}</h2>
+          <button onClick={submitPick} disabled={gameStarted}>Submit Pick</button>
         </div>
       )}
     </div>
   );
 }
+
