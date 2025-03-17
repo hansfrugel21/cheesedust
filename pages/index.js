@@ -12,7 +12,7 @@ export default function Home() {
   const [pick, setPick] = useState("");
   const [picksTable, setPicksTable] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false); // Allows users to preview picks before games start
 
   useEffect(() => {
     fetchExistingUsers();
@@ -27,7 +27,7 @@ export default function Home() {
   }, [tournamentDay, isLoggedIn]);
 
   const checkGameStatus = () => {
-    const firstGameTime = new Date("2025-03-19T12:00:00"); // Adjust to actual start time
+    const firstGameTime = new Date("2025-03-19T12:00:00"); // Adjust this to actual game start time
     const currentTime = new Date();
     setGameStarted(currentTime >= firstGameTime);
   };
@@ -93,58 +93,6 @@ export default function Home() {
     });
 
     setPicksTable(Object.values(latestPicks));
-  };
-
-  const handleSignUp = async () => {
-    if (!username || !email) {
-      alert("Please enter a username and email.");
-      return;
-    }
-
-    const { data: existingUser, error: userError } = await supabase
-      .from("users")
-      .select("username")
-      .eq("username", username)
-      .single();
-
-    if (existingUser) {
-      alert("This username is already taken. Please choose a different one.");
-      return;
-    }
-
-    const { error } = await supabase.from("users").insert([{ username, email }]);
-
-    if (error) {
-      console.error("Error signing up:", error);
-      alert(error.message);
-      return;
-    }
-
-    alert("Signup successful! You can now log in.");
-    fetchExistingUsers();
-  };
-
-  const handleLogin = async () => {
-    if (!username || !email) {
-      alert("Please select your username and enter your email.");
-      return;
-    }
-
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("id, username, email")
-      .eq("username", username)
-      .eq("email", email)
-      .single();
-
-    if (error || !user) {
-      alert("User not found. Make sure your email matches your selected username.");
-      return;
-    }
-
-    setCurrentUser(user);
-    setIsLoggedIn(true);
-    fetchSubmittedPicks();
   };
 
   const submitPick = async () => {
@@ -242,9 +190,20 @@ export default function Home() {
             ))}
           </select>
           <button onClick={submitPick}>Submit Pick</button>
+
+          <h2>Submitted Picks</h2>
+          <ul>
+            {picksTable.map((entry, index) => (
+              <li key={index}>
+                {entry.username} - {entry.tournament_day} - {(gameStarted || previewMode) ? entry.team : "Submitted"}
+              </li>
+            ))}
+          </ul>
+          <button onClick={() => setPreviewMode(!previewMode)}>
+            {previewMode ? "Hide Preview" : "Preview Picks"}
+          </button>
         </div>
       )}
     </div>
   );
 }
-
