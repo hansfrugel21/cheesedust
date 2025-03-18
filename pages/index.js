@@ -13,15 +13,17 @@ export default function Home() {
   const [teams, setTeams] = useState([]);
   const [pick, setPick] = useState("");
   const [tournamentDay, setTournamentDay] = useState("");
-  const [allPicks, setAllPicks] = useState([]);
   const [picksTable, setPicksTable] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [existingUsers, setExistingUsers] = useState([]);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
     fetchTeams();
     fetchSubmittedPicks();
     fetchExistingUsers();
+    checkGameStatus();
   }, []);
 
   const fetchTeams = async () => {
@@ -50,6 +52,12 @@ export default function Home() {
       }
     });
     setPicksTable(Object.values(latestPicks));
+  };
+
+  const checkGameStatus = () => {
+    const firstGameTime = new Date("2025-03-19T12:00:00");
+    const currentTime = new Date();
+    setGameStarted(currentTime >= firstGameTime);
   };
 
   const handleSignUp = async () => {
@@ -95,12 +103,9 @@ export default function Home() {
       return;
     }
 
-    // Prevent re-picking the same team
-    const alreadyPicked = allPicks.some(
-      (p) => p.username === user.username && p.team === pick
-    );
-    if (alreadyPicked) {
-      return alert("You have already picked this team in a previous round.");
+    if (gameStarted) {
+      alert("Picks are locked!");
+      return;
     }
 
     const { data: teamData } = await supabase
@@ -171,9 +176,13 @@ export default function Home() {
           <h2>Submitted Picks</h2>
           <ul>
             {picksTable.map((entry, idx) => (
-              <li key={idx}>{entry.username} - Day {entry.tournament_day} - {entry.team}</li>
+              <li key={idx}>{entry.username} - Day {entry.tournament_day} - {(gameStarted || previewMode) ? entry.team : "Submitted"}</li>
             ))}
           </ul>
+
+          <button onClick={() => setPreviewMode(!previewMode)}>
+            {previewMode ? "Hide Preview" : "Preview Picks"}
+          </button>
 
           <button onClick={handleLogout}>Logout</button>
         </div>
