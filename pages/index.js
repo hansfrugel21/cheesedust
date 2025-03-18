@@ -153,12 +153,11 @@ export default function Home() {
 
   return (
     <div style={{ padding: "20px" }}>
-      <h1>March Madness Survivor Pool</h1>
 
       {!isLoggedIn ? (
         <div>
           <h2>Sign Up</h2>
-          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /> 
           <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <button onClick={handleSignUp}>Sign Up</button>
 
