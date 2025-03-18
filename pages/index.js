@@ -39,15 +39,20 @@ export default function Home() {
   };
 
   const fetchSubmittedPicks = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("picks")
       .select("username, tournament_day, team, date")
       .order("date", { ascending: false });
 
+    if (error) {
+      console.error("Error fetching picks:", error);
+      return;
+    }
+
     const latestPicks = {};
     data?.forEach((entry) => {
       const key = `${entry.username}-${entry.tournament_day}`;
-      if (!latestPicks[key]) {
+      if (!latestPicks[key] || new Date(entry.date) > new Date(latestPicks[key].date)) {
         latestPicks[key] = entry;
       }
     });
