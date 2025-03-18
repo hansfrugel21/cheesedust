@@ -130,15 +130,20 @@ export default function Home() {
       .select("id")
       .eq("user_id", currentUser.id)
       .eq("tournament_day", tournamentDay)
-      .single();
+      .maybeSingle();
 
-    if (existingPick) {
-      await supabase
+    if (existingPick && existingPick.id) {
+      const { error } = await supabase
         .from("picks")
-        .update({ team: teamData.team_name, date: new Date().toISOString() })
+        .update({
+          team: teamData.team_name,
+          date: new Date().toISOString(),
+        })
         .eq("id", existingPick.id);
+
+      if (error) console.error("Error updating pick:", error);
     } else {
-      await supabase.from("picks").insert([
+      const { error } = await supabase.from("picks").insert([
         {
           user_id: currentUser.id,
           username: currentUser.username,
@@ -147,7 +152,10 @@ export default function Home() {
           date: new Date().toISOString(),
         },
       ]);
+
+      if (error) console.error("Error inserting pick:", error);
     }
+
     alert("Pick submitted");
     fetchSubmittedPicks();
   };
