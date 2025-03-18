@@ -1,36 +1,37 @@
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
-  const [user, setUser] = useState(null);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [teams, setTeams] = useState([]);
-  const [pick, setPick] = useState("");
-  const [tournamentDay, setTournamentDay] = useState("");
-  const [picksTable, setPicksTable] = useState([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [existingUsers, setExistingUsers] = useState([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [teams, setTeams] = useState([]);
+  const [tournamentDay, setTournamentDay] = useState("");
+  const [pick, setPick] = useState("");
+  const [picksTable, setPicksTable] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
-    fetchTeams();
-    fetchSubmittedPicks();
     fetchExistingUsers();
+    fetchSubmittedPicks();
     checkGameStatus();
   }, []);
 
-  const fetchTeams = async () => {
-    const { data, error } = await supabase.from("teams").select("id, team_name");
-    if (!error) {
-      setTeams(data);
+  useEffect(() => {
+    if (tournamentDay && isLoggedIn) {
+      fetchTeamsForDay(tournamentDay);
+    } else {
+      setTeams([]);
     }
+  }, [tournamentDay, isLoggedIn]);
+
+  const checkGameStatus = () => {
+    const firstGameTime = new Date("2025-03-19T12:00:00");
+    const currentTime = new Date();
+    setGameStarted(currentTime >= firstGameTime);
   };
 
   const fetchExistingUsers = async () => {
@@ -38,31 +39,38 @@ export default function Home() {
     if (!error) setExistingUsers(data);
   };
 
+  const fetchTeamsForDay = async (day) => {
+    const { data: scheduleData } = await supabase
+      .from("team_schedule")
+      .select("team_id")
+      .eq("tournament_day", day);
+
+    if (scheduleData?.length) {
+      const teamIds = scheduleData.map((entry) => entry.team_id);
+      const { data: teamData } = await supabase
+        .from("teams")
+        .select("id, team_name")
+        .in("id", teamIds);
+      setTeams(teamData);
+    } else {
+      setTeams([]);
+    }
+  };
+
   const fetchSubmittedPicks = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("picks")
       .select("username, tournament_day, team, date")
       .order("date", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching picks:", error);
-      return;
-    }
-
     const latestPicks = {};
     data?.forEach((entry) => {
       const key = `${entry.username}-${entry.tournament_day}`;
-      if (!latestPicks[key] || new Date(entry.date) > new Date(latestPicks[key].date)) {
+      if (!latestPicks[key]) {
         latestPicks[key] = entry;
       }
     });
     setPicksTable(Object.values(latestPicks));
-  };
-
-  const checkGameStatus = () => {
-    const firstGameTime = new Date("2025-03-19T12:00:00");
-    const currentTime = new Date();
-    setGameStarted(currentTime >= firstGameTime);
   };
 
   const handleSignUp = async () => {
@@ -86,20 +94,21 @@ export default function Home() {
   };
 
   const handleLogin = async () => {
-    const { data: userData } = await supabase
+    const { data: user } = await supabase
       .from("users")
       .select("id, username, email")
       .eq("username", username)
       .eq("email", email)
       .single();
 
-    if (!userData) {
+    if (!user) {
       alert("User not found or email mismatch");
       return;
     }
-    setUser(userData);
+    setCurrentUser(user);
     setIsLoggedIn(true);
     fetchSubmittedPicks();
+    if (tournamentDay) fetchTeamsForDay(tournamentDay); // Ensure teams load on login if a day is preselected
   };
 
   const submitPick = async () => {
@@ -119,23 +128,27 @@ export default function Home() {
       .eq("id", pick)
       .single();
 
-    await supabase.from("picks").insert([
+    const { error } = await supabase.from("picks").insert([
       {
-        user_id: user.id,
-        username: user.username,
+        user_id: currentUser.id,
+        username: currentUser.username,
         team: teamData.team_name,
         tournament_day: parseInt(tournamentDay, 10),
         date: new Date().toISOString(),
       },
     ]);
 
+    if (error) console.error("Error inserting pick:", error);
+
     alert("Pick submitted");
     fetchSubmittedPicks();
   };
 
   const handleLogout = () => {
-    setUser(null);
+    setCurrentUser(null);
     setIsLoggedIn(false);
+    setTournamentDay("");
+    setTeams([]);
   };
 
   return (
@@ -162,14 +175,14 @@ export default function Home() {
       ) : (
         <div>
           <h2>Make Your Pick</h2>
-          <select onChange={(e) => setTournamentDay(e.target.value)}>
+          <select onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
             <option value="">Select Day</option>
             {[...Array(10)].map((_, i) => (
               <option key={i + 1} value={i + 1}>Day {i + 1}</option>
             ))}
           </select>
 
-          <select onChange={(e) => setPick(e.target.value)}>
+          <select onChange={(e) => setPick(e.target.value)} value={pick}>
             <option value="">Select Team</option>
             {teams.map((team) => (
               <option key={team.id} value={team.id}>{team.team_name}</option>
