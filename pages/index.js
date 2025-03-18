@@ -108,6 +108,7 @@ export default function Home() {
     fetchSubmittedPicks();
   };
 
+  // New version of submitPick: Always insert (audit trail), let fetchSubmittedPicks pull latest per user per day
   const submitPick = async () => {
     if (!pick || !tournamentDay) {
       alert("Select a team and day");
@@ -125,36 +126,17 @@ export default function Home() {
       .eq("id", pick)
       .single();
 
-    const { data: existingPick } = await supabase
-      .from("picks")
-      .select("id")
-      .eq("user_id", currentUser.id)
-      .eq("tournament_day", tournamentDay)
-      .maybeSingle();
+    const { error } = await supabase.from("picks").insert([
+      {
+        user_id: currentUser.id,
+        username: currentUser.username,
+        team: teamData.team_name,
+        tournament_day: parseInt(tournamentDay, 10),
+        date: new Date().toISOString(),
+      },
+    ]);
 
-    if (existingPick && existingPick.id) {
-      const { error } = await supabase
-        .from("picks")
-        .update({
-          team: teamData.team_name,
-          date: new Date().toISOString(),
-        })
-        .eq("id", existingPick.id);
-
-      if (error) console.error("Error updating pick:", error);
-    } else {
-      const { error } = await supabase.from("picks").insert([
-        {
-          user_id: currentUser.id,
-          username: currentUser.username,
-          team: teamData.team_name,
-          tournament_day: parseInt(tournamentDay, 10),
-          date: new Date().toISOString(),
-        },
-      ]);
-
-      if (error) console.error("Error inserting pick:", error);
-    }
+    if (error) console.error("Error inserting pick:", error);
 
     alert("Pick submitted");
     fetchSubmittedPicks();
