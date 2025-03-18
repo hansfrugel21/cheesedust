@@ -155,7 +155,7 @@ export default function Home() {
     <div style={{ padding: "20px" }}>
 
       {!isLoggedIn ? (
-        <div font=arial>
+        <div>
           <h3>Sign Up</h3>
         <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />  
         <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /> 
