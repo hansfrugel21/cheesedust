@@ -12,14 +12,12 @@ export default function Home() {
   const [pick, setPick] = useState("");
   const [picksTable, setPicksTable] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false); 
+  const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      fetchExistingUsers();
-      fetchSubmittedPicks();
-      checkGameStatus();
-    }
+    fetchExistingUsers();
+    fetchSubmittedPicks();
+    checkGameStatus();
   }, []);
 
   useEffect(() => {
@@ -29,71 +27,47 @@ export default function Home() {
   }, [tournamentDay, isLoggedIn]);
 
   const checkGameStatus = () => {
-    if (typeof window === "undefined") return;
-    const firstGameTime = new Date("2025-03-19T12:00:00"); 
+    const firstGameTime = new Date("2025-03-19T12:00:00");
     const currentTime = new Date();
     setGameStarted(currentTime >= firstGameTime);
   };
 
   const fetchExistingUsers = async () => {
     const { data, error } = await supabase.from("users").select("username, email");
-    if (error) console.error("Error fetching users:", error);
-    else setExistingUsers(data);
+    if (!error) setExistingUsers(data);
   };
 
   const fetchTeamsForDay = async (day) => {
-    if (!day) return;
-
-    const { data: scheduleData, error: scheduleError } = await supabase
+    const { data: scheduleData } = await supabase
       .from("team_schedule")
       .select("team_id")
       .eq("tournament_day", day);
 
-    if (scheduleError) {
-      console.error("Error fetching teams:", scheduleError);
-      return;
-    }
-
-    if (!scheduleData || scheduleData.length === 0) {
+    if (scheduleData?.length) {
+      const teamIds = scheduleData.map((entry) => entry.team_id);
+      const { data: teamData } = await supabase
+        .from("teams")
+        .select("id, team_name")
+        .in("id", teamIds);
+      setTeams(teamData);
+    } else {
       setTeams([]);
-      return;
     }
-
-    const teamIds = scheduleData.map(entry => entry.team_id);
-
-    const { data: teamData, error: teamError } = await supabase
-      .from("teams")
-      .select("id, team_name, seed, ap_rank")
-      .in("id", teamIds)
-      .order("seed", { ascending: true });
-
-    if (teamError) {
-      console.error("Error fetching team details:", teamError);
-      return;
-    }
-
-    setTeams(teamData);
   };
 
   const fetchSubmittedPicks = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("picks")
       .select("username, tournament_day, team, date")
       .order("date", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching submitted picks:", error);
-      return;
-    }
-
     const latestPicks = {};
-    data.forEach((entry) => {
+    data?.forEach((entry) => {
       const key = `${entry.username}-${entry.tournament_day}`;
       if (!latestPicks[key]) {
         latestPicks[key] = entry;
       }
     });
-
     setPicksTable(Object.values(latestPicks));
   };
 
@@ -102,7 +76,6 @@ export default function Home() {
       alert("Please enter a username and email.");
       return;
     }
-
     const { data: existingUser } = await supabase
       .from("users")
       .select("username")
@@ -110,42 +83,72 @@ export default function Home() {
       .single();
 
     if (existingUser) {
-      alert("This username is already taken. Please choose a different one.");
+      alert("Username taken");
       return;
     }
-
-    const { error } = await supabase.from("users").insert([{ username, email }]);
-
-    if (error) {
-      console.error("Error signing up:", error);
-      alert(error.message);
-      return;
-    }
-
-    alert("Signup successful! You can now log in.");
+    await supabase.from("users").insert([{ username, email }]);
+    alert("Signup successful!");
     fetchExistingUsers();
   };
 
   const handleLogin = async () => {
-    if (!username || !email) {
-      alert("Please select your username and enter your email.");
-      return;
-    }
-
-    const { data: user, error } = await supabase
+    const { data: user } = await supabase
       .from("users")
       .select("id, username, email")
       .eq("username", username)
       .eq("email", email)
       .single();
 
-    if (error || !user) {
-      alert("User not found. Make sure your email matches your selected username.");
+    if (!user) {
+      alert("User not found or email mismatch");
+      return;
+    }
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+    fetchSubmittedPicks();
+  };
+
+  const submitPick = async () => {
+    if (!pick || !tournamentDay) {
+      alert("Select a team and day");
       return;
     }
 
-    setCurrentUser(user);
-    setIsLoggedIn(true);
+    if (gameStarted) {
+      alert("Picks are locked!");
+      return;
+    }
+
+    const { data: teamData } = await supabase
+      .from("teams")
+      .select("team_name")
+      .eq("id", pick)
+      .single();
+
+    const { data: existingPick } = await supabase
+      .from("picks")
+      .select("id")
+      .eq("user_id", currentUser.id)
+      .eq("tournament_day", tournamentDay)
+      .single();
+
+    if (existingPick) {
+      await supabase
+        .from("picks")
+        .update({ team: teamData.team_name, date: new Date().toISOString() })
+        .eq("id", existingPick.id);
+    } else {
+      await supabase.from("picks").insert([
+        {
+          user_id: currentUser.id,
+          username: currentUser.username,
+          team: teamData.team_name,
+          tournament_day: parseInt(tournamentDay, 10),
+          date: new Date().toISOString(),
+        },
+      ]);
+    }
+    alert("Pick submitted");
     fetchSubmittedPicks();
   };
 
@@ -161,32 +164,46 @@ export default function Home() {
       {!isLoggedIn ? (
         <div>
           <h2>Sign Up</h2>
-          <input type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input type="text" placeholder="Enter a username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <button onClick={handleSignUp}>Sign Up</button>
 
-          <h3>Or Select an Existing User</h3>
+          <h3>Or Login</h3>
           <select onChange={(e) => setUsername(e.target.value)}>
-            <option value="">Select a user</option>
+            <option value="">Select user</option>
             {existingUsers.map((user) => (
-              <option key={user.username} value={user.username}>
-                {user.username}
-              </option>
+              <option key={user.username} value={user.username}>{user.username}</option>
             ))}
           </select>
-          <input type="email" placeholder="Confirm your email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <button onClick={handleLogin}>Login</button>
         </div>
       ) : (
         <div>
+          <h2>Make Your Pick</h2>
+          <select onChange={(e) => setTournamentDay(e.target.value)}>
+            <option value="">Select Day</option>
+            {[...Array(10)].map((_, i) => (
+              <option key={i + 1} value={i + 1}>Day {i + 1}</option>
+            ))}
+          </select>
+
+          <select onChange={(e) => setPick(e.target.value)}>
+            <option value="">Select Team</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>{team.team_name}</option>
+            ))}
+          </select>
+
+          <button onClick={submitPick}>Submit Pick</button>
+
           <h2>Submitted Picks</h2>
           <ul>
-            {picksTable.map((entry, index) => (
-              <li key={index}>
-                {entry.username} - {entry.tournament_day} - {(gameStarted || previewMode) ? entry.team : "Submitted"}
-              </li>
+            {picksTable.map((entry, idx) => (
+              <li key={idx}>{entry.username} - Day {entry.tournament_day} - {(gameStarted || previewMode) ? entry.team : "Submitted"}</li>
             ))}
           </ul>
+
           <button onClick={() => setPreviewMode(!previewMode)}>
             {previewMode ? "Hide Preview" : "Preview Picks"}
           </button>
@@ -197,5 +214,3 @@ export default function Home() {
     </div>
   );
 }
-
-
