@@ -20,41 +20,9 @@ export default function Home() {
     checkGameStatus();
   }, []);
 
-  useEffect(() => {
-    if (tournamentDay && isLoggedIn) {
-      fetchTeamsForDay(tournamentDay);
-    } else {
-      setTeams([]);
-    }
-  }, [tournamentDay, isLoggedIn]);
-
-  const checkGameStatus = () => {
-    const firstGameTime = new Date("2025-03-19T12:00:00");
-    const currentTime = new Date();
-    setGameStarted(currentTime >= firstGameTime);
-  };
-
   const fetchExistingUsers = async () => {
     const { data, error } = await supabase.from("users").select("username, email");
     if (!error) setExistingUsers(data);
-  };
-
-  const fetchTeamsForDay = async (day) => {
-    const { data: scheduleData } = await supabase
-      .from("team_schedule")
-      .select("team_id")
-      .eq("tournament_day", day);
-
-    if (scheduleData?.length) {
-      const teamIds = scheduleData.map((entry) => entry.team_id);
-      const { data: teamData } = await supabase
-        .from("teams")
-        .select("id, team_name")
-        .in("id", teamIds);
-      setTeams(teamData);
-    } else {
-      setTeams([]);
-    }
   };
 
   const fetchSubmittedPicks = async () => {
@@ -108,17 +76,11 @@ export default function Home() {
     setCurrentUser(user);
     setIsLoggedIn(true);
     fetchSubmittedPicks();
-    if (tournamentDay) fetchTeamsForDay(tournamentDay); // Ensure teams load on login if a day is preselected
   };
 
   const submitPick = async () => {
     if (!pick || !tournamentDay) {
       alert("Select a team and day");
-      return;
-    }
-
-    if (gameStarted) {
-      alert("Picks are locked!");
       return;
     }
 
@@ -128,7 +90,7 @@ export default function Home() {
       .eq("id", pick)
       .single();
 
-    const { error } = await supabase.from("picks").insert([
+    await supabase.from("picks").insert([
       {
         user_id: currentUser.id,
         username: currentUser.username,
@@ -138,9 +100,51 @@ export default function Home() {
       },
     ]);
 
-    if (error) console.error("Error inserting pick:", error);
-
     alert("Pick submitted");
+    fetchSubmittedPicks();
+  };
+
+  const autoPickForUsers = async () => {
+    const { data: users } = await supabase.from("users").select("id, username");
+    const { data: picksToday } = await supabase
+      .from("picks")
+      .select("username")
+      .eq("tournament_day", tournamentDay);
+
+    const pickedUsernames = picksToday?.map((p) => p.username) || [];
+
+    for (const user of users) {
+      if (!pickedUsernames.includes(user.username)) {
+        const { data: userPicks } = await supabase
+          .from("picks")
+          .select("team")
+          .eq("username", user.username);
+        const pickedTeams = userPicks.map((p) => p.team);
+
+        const { data: scheduledTeams } = await supabase
+          .from("team_schedule")
+          .select("team_id, seed, ap_rank")
+          .eq("tournament_day", tournamentDay)
+          .order("seed", { ascending: true })
+          .order("ap_rank", { ascending: true });
+
+        const teamToPick = scheduledTeams.find(
+          (team) => !pickedTeams.includes(team.team_id)
+        );
+
+        if (teamToPick) {
+          await supabase.from("picks").insert([
+            {
+              user_id: user.id,
+              username: user.username,
+              team: teamToPick.team_id,
+              tournament_day: parseInt(tournamentDay, 10),
+              date: new Date().toISOString(),
+            },
+          ]);
+        }
+      }
+    }
     fetchSubmittedPicks();
   };
 
@@ -153,12 +157,13 @@ export default function Home() {
 
   return (
     <div style={{ padding: "20px" }}>
+      <h1>March Madness Survivor Pool</h1>
 
       {!isLoggedIn ? (
         <div>
-          <h3>Sign Up</h3>
-        <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />  
-        <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /> 
+          <h2>Sign Up</h2>
+          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <button onClick={handleSignUp}>Sign Up</button>
 
           <h3>Or Login</h3>
@@ -202,6 +207,9 @@ export default function Home() {
           </button>
 
           <button onClick={handleLogout}>Logout</button>
+
+          {/* ✅ Manual AutoPick Trigger Button */}
+          <button onClick={() => autoPickForUsers()}>Run AutoPick Test</button>
         </div>
       )}
     </div>
