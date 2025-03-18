@@ -20,6 +20,13 @@ export default function Home() {
     checkGameStatus();
   }, []);
 
+  const checkGameStatus = () => {
+    const firstGameTime = new Date("2025-03-19T12:00:00");
+    const currentTime = new Date();
+    setGameStarted(currentTime >= firstGameTime);
+    if (currentTime >= firstGameTime) autoPickForUsers();
+  };
+
   const fetchExistingUsers = async () => {
     const { data, error } = await supabase.from("users").select("username, email");
     if (!error) setExistingUsers(data);
