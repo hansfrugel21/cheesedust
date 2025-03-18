@@ -16,6 +16,35 @@ export default function Home() {
 
   useEffect(() => {
     fetchExistingUsers();
+
+    // ✅ Dynamically fetch teams when tournamentDay changes
+    const fetchTeamsForDay = async () => {
+      if (!tournamentDay) {
+        setTeams([]);
+        return;
+      }
+      const { data: scheduleData } = await supabase
+        .from("team_schedule")
+        .select("team_id")
+        .eq("tournament_day", tournamentDay);
+
+      if (scheduleData?.length) {
+        const teamIds = scheduleData.map((entry) => entry.team_id);
+        const { data: teamData } = await supabase
+          .from("teams")
+          .select("id, team_name")
+          .in("id", teamIds);
+        setTeams(teamData);
+      } else {
+        setTeams([]);
+      }
+    };
+
+    fetchTeamsForDay();
+  }, [tournamentDay]);
+
+  useEffect(() => {
+    fetchExistingUsers();
     fetchSubmittedPicks();
     checkGameStatus();
   }, []);
