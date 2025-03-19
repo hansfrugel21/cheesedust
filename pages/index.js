@@ -12,7 +12,7 @@ export default function Home() {
   const [tournamentDay, setTournamentDay] = useState("");
   const [pick, setPick] = useState("");
   const [picksTable, setPicksTable] = useState([]);
-  const [gameStarted, setGameStarted] = useState(false);
+  const [gameStartedDays, setGameStartedDays] = useState({});
   const [previewMode, setPreviewMode] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -52,10 +52,19 @@ export default function Home() {
   }, []);
 
   const checkGameStatus = () => {
-    const firstGameTime = new Date("2025-03-19T12:00:00");
+    // Example: Map of tournament day -> first game time
+    const firstGameTimes = {
+      1: new Date("2025-03-19T12:00:00"),
+      2: new Date("2025-03-20T12:00:00"),
+      3: new Date("2025-03-21T12:00:00")
+      // Add more days as needed
+    };
     const currentTime = new Date();
-    setGameStarted(currentTime >= firstGameTime);
-    if (currentTime >= firstGameTime) autoPickForUsers();
+    const newGameStartedDays = {};
+    Object.entries(firstGameTimes).forEach(([day, gameTime]) => {
+      newGameStartedDays[day] = currentTime >= gameTime;
+    });
+    setGameStartedDays(newGameStartedDays);
   };
 
   const fetchExistingUsers = async () => {
@@ -98,7 +107,7 @@ export default function Home() {
     }
     await supabase.from("users").insert([{ username, email, venmo }]);
     fetchExistingUsers();
-    setSuccessMessage("Signup successful! You can now log in.");
+    setSuccessMessage("Signup successful! You can now log in below.");
   };
 
   const handleLogin = async () => {
@@ -236,7 +245,11 @@ export default function Home() {
           <h2>Submitted Picks</h2>
           <ul>
             {picksTable.map((entry, idx) => (
-              <li key={idx}>{entry.username} - Day {entry.tournament_day} - {(gameStarted || previewMode) ? entry.teams.team_name : "Submitted"}</li>
+              <li key={idx}>
+                {entry.username} - Day {entry.tournament_day} - {
+                  (gameStartedDays[entry.tournament_day] || previewMode) ? entry.teams.team_name : "Submitted"
+                }
+              </li>
             ))}
           </ul>
 
@@ -246,3 +259,4 @@ export default function Home() {
     </div>
   );
 }
+
