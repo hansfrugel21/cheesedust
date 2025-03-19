@@ -14,6 +14,7 @@ export default function Home() {
   const [picksTable, setPicksTable] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     fetchExistingUsers();
@@ -78,8 +79,9 @@ export default function Home() {
   };
 
   const handleSignUp = async () => {
+    setErrorMessage("");
     if (!username || !email || !venmo) {
-      alert("Please enter a username and email.");
+      setErrorMessage("Please enter a username, email, and Venmo ID.");
       return;
     }
     const { data: existingUser } = await supabase
@@ -89,15 +91,15 @@ export default function Home() {
       .single();
 
     if (existingUser) {
-      alert("Username taken");
+      setErrorMessage("Username is taken.");
       return;
     }
     await supabase.from("users").insert([{ username, email, venmo }]);
-    alert("Signup successful!");
     fetchExistingUsers();
   };
 
   const handleLogin = async () => {
+    setErrorMessage("");
     const { data: user } = await supabase
       .from("users")
       .select("id, username, email")
@@ -106,7 +108,7 @@ export default function Home() {
       .single();
 
     if (!user) {
-      alert("User not found or email mismatch");
+      setErrorMessage("User not found or email mismatch");
       return;
     }
     setCurrentUser(user);
@@ -115,11 +117,11 @@ export default function Home() {
   };
 
   const submitPick = async () => {
+    setErrorMessage("");
     if (!pick || !tournamentDay) {
-      alert("Select a team and day");
+      setErrorMessage("Please select a team and day.");
       return;
     }
-
     await supabase.from("picks").insert([
       {
         user_id: currentUser.id,
@@ -129,8 +131,6 @@ export default function Home() {
         date: new Date().toISOString(),
       },
     ]);
-
-    alert("Pick submitted");
     fetchSubmittedPicks();
   };
 
@@ -187,7 +187,6 @@ export default function Home() {
 
   return (
     <div style={{ padding: "20px" }}>
-     
       {!isLoggedIn ? (
         <div>
           <h2>Sign Up</h2>
@@ -196,7 +195,7 @@ export default function Home() {
           <input placeholder="Venmo ID" value={venmo} onChange={(e) => setVenmo(e.target.value)} />
           <button onClick={handleSignUp}>Sign Up</button>
 
-       <div hidden>   <h3>Or Login</h3>
+          <h3>Or Login</h3>
           <select onChange={(e) => setUsername(e.target.value)}>
             <option value="">Select user</option>
             {existingUsers.map((user) => (
@@ -205,7 +204,9 @@ export default function Home() {
           </select>
           <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <button onClick={handleLogin}>Login</button>
-        </div></div>
+
+          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+        </div>
       ) : (
         <div>
           <h2>Make Your Pick</h2>
@@ -225,6 +226,8 @@ export default function Home() {
 
           <button onClick={submitPick}>Submit Pick</button>
 
+          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+
           <h2>Submitted Picks</h2>
           <ul>
             {picksTable.map((entry, idx) => (
@@ -232,10 +235,7 @@ export default function Home() {
             ))}
           </ul>
 
-
           <button onClick={handleLogout}>Logout</button>
-
-        
         </div>
       )}
     </div>
