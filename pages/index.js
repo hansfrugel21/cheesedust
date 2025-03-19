@@ -196,7 +196,7 @@ export default function Home() {
           <input placeholder="Venmo ID" value={venmo} onChange={(e) => setVenmo(e.target.value)} />
           <button onClick={handleSignUp}>Sign Up</button>
 
-          <h3>Or Login</h3>
+       <div hidden>   <h3>Or Login</h3>
           <select onChange={(e) => setUsername(e.target.value)}>
             <option value="">Select user</option>
             {existingUsers.map((user) => (
@@ -205,7 +205,7 @@ export default function Home() {
           </select>
           <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <button onClick={handleLogin}>Login</button>
-        </div>
+        </div></div>
       ) : (
         <div>
           <h2>Make Your Pick</h2>
