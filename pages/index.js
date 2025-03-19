@@ -15,6 +15,7 @@ export default function Home() {
   const [gameStarted, setGameStarted] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     fetchExistingUsers();
@@ -80,6 +81,7 @@ export default function Home() {
 
   const handleSignUp = async () => {
     setErrorMessage("");
+    setSuccessMessage("");
     if (!username || !email || !venmo) {
       setErrorMessage("Please enter a username, email, and Venmo ID.");
       return;
@@ -96,10 +98,12 @@ export default function Home() {
     }
     await supabase.from("users").insert([{ username, email, venmo }]);
     fetchExistingUsers();
+    setSuccessMessage("Signup successful! You can now log in.");
   };
 
   const handleLogin = async () => {
     setErrorMessage("");
+    setSuccessMessage("");
     const { data: user } = await supabase
       .from("users")
       .select("id, username, email")
@@ -206,6 +210,7 @@ export default function Home() {
           <button onClick={handleLogin}>Login</button>
 
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+          {successMessage && <div style={{ color: "green", marginTop: "10px" }}>{successMessage}</div>}
         </div>
       ) : (
         <div>
