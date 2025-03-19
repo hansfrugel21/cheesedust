@@ -233,9 +233,6 @@ export default function Home() {
             ))}
           </ul>
 
-          //<button onClick={() => setPreviewMode(!previewMode)}>
-            //{previewMode ? "Hide Preview" : "Preview Picks"}
-         // </button>
 
           <button onClick={handleLogout}>Logout</button>
 
