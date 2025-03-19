@@ -192,14 +192,14 @@ export default function Home() {
       {!isLoggedIn ? (
         <div>
           <h2>Sign Up</h2>
-          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /><br>
-          <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} /><br>
-          <input placeholder="Venmo ID" value={venmo} onChange={(e) => setVenmo(e.target.value)} /><br>
+          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input placeholder="Venmo ID" value={venmo} onChange={(e) => setVenmo(e.target.value)} />
           <button onClick={handleSignUp}>Sign Up</button>
 
           <h3>Or Login</h3>
           <select onChange={(e) => setUsername(e.target.value)}>
-            <option value="">Select user</option><br>
+            <option value="">Select user</option>
             {existingUsers.map((user) => (
               <option key={user.username} value={user.username}>{user.username}</option>
             ))}
