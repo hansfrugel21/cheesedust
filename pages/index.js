@@ -187,8 +187,7 @@ export default function Home() {
 
   return (
     <div style={{ padding: "20px" }}>
-      <h1>March Madness Survivor Pool</h1>
-
+     
       {!isLoggedIn ? (
         <div>
           <h2>Sign Up</h2>
