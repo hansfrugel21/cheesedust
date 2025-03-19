@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
   const [username, setUsername] = useState("");
+  const [venmo, setVenmo] = useState("");
   const [email, setEmail] = useState("");
   const [existingUsers, setExistingUsers] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -17,7 +18,6 @@ export default function Home() {
   useEffect(() => {
     fetchExistingUsers();
 
-    // ✅ Dynamically fetch teams when tournamentDay changes
     const fetchTeamsForDay = async () => {
       if (!tournamentDay) {
         setTeams([]);
@@ -64,7 +64,7 @@ export default function Home() {
   const fetchSubmittedPicks = async () => {
     const { data } = await supabase
       .from("picks")
-      .select("username, tournament_day, team, date")
+      .select("username, tournament_day, team_id, date, teams(team_name)")
       .order("date", { ascending: false });
 
     const latestPicks = {};
@@ -78,7 +78,7 @@ export default function Home() {
   };
 
   const handleSignUp = async () => {
-    if (!username || !email) {
+    if (!username || !email || !venmo) {
       alert("Please enter a username and email.");
       return;
     }
@@ -92,7 +92,7 @@ export default function Home() {
       alert("Username taken");
       return;
     }
-    await supabase.from("users").insert([{ username, email }]);
+    await supabase.from("users").insert([{ username, email, venmo }]);
     alert("Signup successful!");
     fetchExistingUsers();
   };
@@ -120,17 +120,11 @@ export default function Home() {
       return;
     }
 
-    const { data: teamData } = await supabase
-      .from("teams")
-      .select("team_name")
-      .eq("id", pick)
-      .single();
-
     await supabase.from("picks").insert([
       {
         user_id: currentUser.id,
         username: currentUser.username,
-        team: teamData.team_name,
+        team_id: pick,
         tournament_day: parseInt(tournamentDay, 10),
         date: new Date().toISOString(),
       },
@@ -153,9 +147,9 @@ export default function Home() {
       if (!pickedUsernames.includes(user.username)) {
         const { data: userPicks } = await supabase
           .from("picks")
-          .select("team")
+          .select("team_id")
           .eq("username", user.username);
-        const pickedTeams = userPicks.map((p) => p.team);
+        const pickedTeams = userPicks.map((p) => p.team_id);
 
         const { data: scheduledTeams } = await supabase
           .from("team_schedule")
@@ -173,7 +167,7 @@ export default function Home() {
             {
               user_id: user.id,
               username: user.username,
-              team: teamToPick.team_id,
+              team_id: teamToPick.team_id,
               tournament_day: parseInt(tournamentDay, 10),
               date: new Date().toISOString(),
             },
@@ -200,6 +194,7 @@ export default function Home() {
           <h2>Sign Up</h2>
           <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input placeholder="Venmo ID" value={venmo} onChange={(e) => setVenmo(e.target.value)} />
           <button onClick={handleSignUp}>Sign Up</button>
 
           <h3>Or Login</h3>
@@ -234,7 +229,7 @@ export default function Home() {
           <h2>Submitted Picks</h2>
           <ul>
             {picksTable.map((entry, idx) => (
-              <li key={idx}>{entry.username} - Day {entry.tournament_day} - {(gameStarted || previewMode) ? entry.team : "Submitted"}</li>
+              <li key={idx}>{entry.username} - Day {entry.tournament_day} - {(gameStarted || previewMode) ? entry.teams.team_name : "Submitted"}</li>
             ))}
           </ul>
 
@@ -244,7 +239,6 @@ export default function Home() {
 
           <button onClick={handleLogout}>Logout</button>
 
-          {/* ✅ Manual AutoPick Trigger Button */}
           <button onClick={() => autoPickForUsers()}>Run AutoPick Test</button>
         </div>
       )}
