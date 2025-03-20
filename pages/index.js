@@ -202,13 +202,13 @@ export default function Home() {
     <div style={{ padding: "20px" }}>
       {!isLoggedIn ? (
         <div>
-          <h2>Sign Up</h2>
+          <Div hidden><h2>Sign Up</h2>
           <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <input placeholder="Venmo ID" value={venmo} onChange={(e) => setVenmo(e.target.value)} />
-          <button onClick={handleSignUp}>Sign Up</button>
+          <button onClick={handleSignUp}>Sign Up</button></div>
 
-          <h3>Or Login</h3>
+          <h3>Login</h3>
           <select onChange={(e) => setUsername(e.target.value)}>
             <option value="">Select user</option>
             {existingUsers.map((user) => (
