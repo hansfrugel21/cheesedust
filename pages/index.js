@@ -202,7 +202,7 @@ export default function Home() {
     <div style={{ padding: "20px" }}>
       {!isLoggedIn ? (
         <div>
-          <Div hidden><h2>Sign Up</h2>
+          <div hidden><h2>Sign Up</h2>
           <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <input placeholder="Venmo ID" value={venmo} onChange={(e) => setVenmo(e.target.value)} />
