@@ -1,4 +1,4 @@
-// Updated /pages/comments.js to support threading and prevent null error
+// Updated /pages/comments.js with Supabase Auth login (Option #2)
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -7,18 +7,25 @@ export default function CommentsPage() {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [replyTo, setReplyTo] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     fetchComments();
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) setCurrentUser(user);
+  };
 
   const fetchComments = async () => {
     const { data } = await supabase
       .from("comments")
-      .select("id, username, comment_text, created_at, parent_id")
+      .select("id, username, user_id, comment_text, created_at, parent_id")
       .order("created_at", { ascending: true });
     setComments(data || []);
   };
@@ -31,22 +38,35 @@ export default function CommentsPage() {
       return;
     }
 
-    await supabase.from("comments").insert([
+    const { error } = await supabase.from("comments").insert([
       {
         user_id: currentUser.id,
-        username: currentUser.username,
+        username: currentUser.user_metadata.username || "Anonymous",
         comment_text: newComment,
         parent_id: replyTo,
       },
     ]);
+
+    if (error) {
+      setErrorMessage("Error submitting comment");
+      return;
+    }
+
     setNewComment("");
     setReplyTo(null);
     fetchComments();
   };
 
-  const fakeLogin = () => {
-    setCurrentUser({ id: "demo-user-id", username: "DemoUser" });
-    setIsLoggedIn(true);
+  const handleDeleteComment = async (commentId) => {
+    await supabase.from("comments").delete().eq("id", commentId);
+    fetchComments();
+  };
+
+  const handleLogin = async (email) => {
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    if (error) {
+      setErrorMessage("Failed to send login email");
+    }
   };
 
   const renderComments = (parentId = null, level = 0) => {
@@ -71,10 +91,23 @@ export default function CommentsPage() {
           <br />
           {comment.comment_text}
           <br />
-          {isLoggedIn && (
-            <button onClick={() => setReplyTo(comment.id)} style={{ fontSize: "12px" }}>
-              Reply
-            </button>
+          {currentUser && (
+            <>
+              <button
+                onClick={() => setReplyTo(comment.id)}
+                style={{ fontSize: "12px", marginRight: "10px" }}
+              >
+                Reply
+              </button>
+              {comment.user_id === currentUser.id && (
+                <button
+                  onClick={() => handleDeleteComment(comment.id)}
+                  style={{ fontSize: "12px", color: "red" }}
+                >
+                  Delete
+                </button>
+              )}
+            </>
           )}
           {renderComments(comment.id, level + 1)}
         </div>
@@ -85,8 +118,16 @@ export default function CommentsPage() {
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
       <h2>Comment Board</h2>
       <div style={{ marginBottom: "15px" }}>
-        {!isLoggedIn ? (
-          <button onClick={fakeLogin}>Login to Comment</button>
+        {!currentUser ? (
+          <div>
+            <input
+              type="email"
+              placeholder="Enter your email"
+              onBlur={(e) => handleLogin(e.target.value)}
+              style={{ marginBottom: "10px", width: "300px" }}
+            />
+            <p style={{ fontSize: "12px" }}>You'll receive a login email link.</p>
+          </div>
         ) : (
           <>
             {replyTo && (
