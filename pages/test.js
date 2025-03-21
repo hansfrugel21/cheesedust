@@ -1,4 +1,4 @@
-// ✅ Updated with Cheesedust design integration, styling, and conditional pick reveal
+// ✅ Updated with threaded comments, scrollable comment section, and subtle table borders
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -68,18 +68,40 @@ export default function Home() {
   const fetchComments = async () => {
     const { data } = await supabase
       .from("comments")
-      .select("id, username, comment_text, created_at")
+      .select("id, username, comment_text, created_at, parent_id")
       .order("created_at", { ascending: true });
     setComments(data || []);
   };
 
-  const handleAddComment = async () => {
+  const handleAddComment = async (parentId = null) => {
     if (!newComment.trim() || !currentUser) return;
     await supabase.from("comments").insert([
-      { user_id: currentUser.id, username: currentUser.username, comment_text: newComment }
+      { user_id: currentUser.id, username: currentUser.username, comment_text: newComment, parent_id: parentId }
     ]);
     setNewComment("");
     fetchComments();
+  };
+
+  const renderComments = (parentId = null, level = 0) => {
+    return comments
+      .filter(comment => comment.parent_id === parentId)
+      .map(comment => (
+        <div key={comment.id} style={{
+          marginLeft: level * 20,
+          padding: "10px",
+          background: "#fff",
+          borderRadius: "8px",
+          marginBottom: "10px",
+          border: "1px solid #ddd"
+        }}>
+          <b>{comment.username}</b>: {comment.comment_text}
+          <div style={{ fontSize: "12px", color: "gray" }}>{new Date(comment.created_at).toLocaleString()}</div>
+          {isLoggedIn && (
+            <button style={{ marginTop: "5px", fontSize: "12px" }} onClick={() => handleAddComment(comment.id)}>Reply</button>
+          )}
+          {renderComments(comment.id, level + 1)}
+        </div>
+      ));
   };
 
   const fetchTeamsForDay = async () => {
@@ -171,16 +193,13 @@ export default function Home() {
       )}
 
       <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Comments</h2>
-      {comments.map((comment) => (
-        <div key={comment.id} style={{ marginBottom: "15px", background: "#fff", padding: "10px", borderRadius: "8px" }}>
-          <b>{comment.username}</b>: {comment.comment_text}
-          <div style={{ fontSize: "12px", color: "gray" }}>{new Date(comment.created_at).toLocaleString()}</div>
-        </div>
-      ))}
+      <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "10px" }}>
+        {renderComments()}
+      </div>
       {isLoggedIn && (
         <div style={{ marginBottom: "30px" }}>
           <textarea rows="3" style={{ width: "100%", padding: "10px", borderRadius: "8px" }} placeholder="Write a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} />
-          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none", marginTop: "10px" }} onClick={handleAddComment}>Post Comment</button>
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none", marginTop: "10px" }} onClick={() => handleAddComment(null)}>Post Comment</button>
         </div>
       )}
 
@@ -201,23 +220,23 @@ export default function Home() {
       )}
 
       <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Submitted Picks</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff", border: "1px solid #ddd" }}>
         <thead>
           <tr style={{ backgroundColor: "#f4b942", color: "#fff" }}>
-            <th style={{ padding: "10px" }}>Username</th>
-            {days.map((day) => (<th key={day} style={{ padding: "10px" }}>Day {day}</th>))}
+            <th style={{ padding: "10px", border: "1px solid #ddd" }}>Username</th>
+            {days.map((day) => (<th key={day} style={{ padding: "10px", border: "1px solid #ddd" }}>Day {day}</th>))}
           </tr>
         </thead>
         <tbody>
           {uniqueUsers.map((user, idx) => (
             <tr key={user} style={{ backgroundColor: idx % 2 === 0 ? "#fdf5e6" : "#fff" }}>
-              <td style={{ padding: "10px" }}>{user}</td>
+              <td style={{ padding: "10px", border: "1px solid #ddd" }}>{user}</td>
               {days.map((day) => {
                 const pickEntry = picksTable.find(
                   (entry) => entry.username === user && entry.tournament_day === day
                 );
                 return (
-                  <td style={{ padding: "10px" }} key={day}>
+                  <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
                     {pickEntry ? (
                       (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
                         ? pickEntry.teams.team_name
