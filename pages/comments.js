@@ -1,4 +1,4 @@
-// Updated /pages/comments.js to support threading
+// Updated /pages/comments.js to support threading and prevent null error
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -20,7 +20,7 @@ export default function CommentsPage() {
       .from("comments")
       .select("id, username, comment_text, created_at, parent_id")
       .order("created_at", { ascending: true });
-    setComments(data);
+    setComments(data || []);
   };
 
   const handleAddComment = async () => {
@@ -50,6 +50,8 @@ export default function CommentsPage() {
   };
 
   const renderComments = (parentId = null, level = 0) => {
+    if (!comments || comments.length === 0) return null;
+
     return comments
       .filter((comment) => comment.parent_id === parentId)
       .map((comment) => (
