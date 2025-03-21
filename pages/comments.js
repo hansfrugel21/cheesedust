@@ -1,4 +1,4 @@
-// Updated /pages/comments.js with username/email login instead of magic link
+// Updated /pages/comments.js with username dropdown, proper user_id handling, and error logging
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -11,17 +11,28 @@ export default function CommentsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [loginUsername, setLoginUsername] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
+  const [existingUsers, setExistingUsers] = useState([]);
 
   useEffect(() => {
     fetchComments();
+    fetchExistingUsers();
   }, []);
 
   const fetchComments = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("comments")
       .select("id, username, user_id, comment_text, created_at, parent_id")
       .order("created_at", { ascending: true });
+    if (error) console.error("Fetch Comments Error:", error);
     setComments(data || []);
+  };
+
+  const fetchExistingUsers = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("username")
+      .order("username", { ascending: true });
+    if (!error) setExistingUsers(data || []);
   };
 
   const handleAddComment = async () => {
@@ -37,11 +48,12 @@ export default function CommentsPage() {
         user_id: currentUser.id,
         username: currentUser.username,
         comment_text: newComment,
-        parent_id: replyTo,
+        parent_id: replyTo || null,
       },
     ]);
 
     if (error) {
+      console.error("Insert Comment Error:", error);
       setErrorMessage("Error submitting comment");
       return;
     }
@@ -52,14 +64,15 @@ export default function CommentsPage() {
   };
 
   const handleDeleteComment = async (commentId) => {
-    await supabase.from("comments").delete().eq("id", commentId);
+    const { error } = await supabase.from("comments").delete().eq("id", commentId);
+    if (error) console.error("Delete Error:", error);
     fetchComments();
   };
 
   const handleLogin = async () => {
     setErrorMessage("");
     if (!loginUsername || !loginEmail) {
-      setErrorMessage("Please enter both username and email.");
+      setErrorMessage("Please select a username and enter an email.");
       return;
     }
 
@@ -71,6 +84,7 @@ export default function CommentsPage() {
       .single();
 
     if (error || !user) {
+      console.error("Login Error:", error);
       setErrorMessage("User not found or email mismatch.");
       return;
     }
@@ -129,13 +143,18 @@ export default function CommentsPage() {
 
       {!currentUser ? (
         <div style={{ marginBottom: "15px" }}>
-          <input
-            type="text"
-            placeholder="Username"
-            value={loginUsername}
+          <select
             onChange={(e) => setLoginUsername(e.target.value)}
+            value={loginUsername}
             style={{ marginBottom: "10px", width: "300px" }}
-          />
+          >
+            <option value="">Select Username</option>
+            {existingUsers.map((user) => (
+              <option key={user.username} value={user.username}>
+                {user.username}
+              </option>
+            ))}
+          </select>
           <input
             type="email"
             placeholder="Email"
