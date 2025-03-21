@@ -1,4 +1,4 @@
-// Updated /pages/comments.js with Supabase Auth login (Option #2)
+// Updated /pages/comments.js with username/email login instead of magic link
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -9,18 +9,12 @@ export default function CommentsPage() {
   const [replyTo, setReplyTo] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
 
   useEffect(() => {
     fetchComments();
-    checkAuth();
   }, []);
-
-  const checkAuth = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) setCurrentUser(user);
-  };
 
   const fetchComments = async () => {
     const { data } = await supabase
@@ -41,7 +35,7 @@ export default function CommentsPage() {
     const { error } = await supabase.from("comments").insert([
       {
         user_id: currentUser.id,
-        username: currentUser.user_metadata.username || "Anonymous",
+        username: currentUser.username,
         comment_text: newComment,
         parent_id: replyTo,
       },
@@ -62,11 +56,26 @@ export default function CommentsPage() {
     fetchComments();
   };
 
-  const handleLogin = async (email) => {
-    const { error } = await supabase.auth.signInWithOtp({ email });
-    if (error) {
-      setErrorMessage("Failed to send login email");
+  const handleLogin = async () => {
+    setErrorMessage("");
+    if (!loginUsername || !loginEmail) {
+      setErrorMessage("Please enter both username and email.");
+      return;
     }
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, username")
+      .eq("username", loginUsername)
+      .eq("email", loginEmail)
+      .single();
+
+    if (error || !user) {
+      setErrorMessage("User not found or email mismatch.");
+      return;
+    }
+
+    setCurrentUser(user);
   };
 
   const renderComments = (parentId = null, level = 0) => {
@@ -117,36 +126,43 @@ export default function CommentsPage() {
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
       <h2>Comment Board</h2>
-      <div style={{ marginBottom: "15px" }}>
-        {!currentUser ? (
-          <div>
-            <input
-              type="email"
-              placeholder="Enter your email"
-              onBlur={(e) => handleLogin(e.target.value)}
-              style={{ marginBottom: "10px", width: "300px" }}
-            />
-            <p style={{ fontSize: "12px" }}>You'll receive a login email link.</p>
-          </div>
-        ) : (
-          <>
-            {replyTo && (
-              <div style={{ marginBottom: "8px" }}>
-                Replying to comment ID: {replyTo}{" "}
-                <button onClick={() => setReplyTo(null)}>Cancel</button>
-              </div>
-            )}
-            <textarea
-              rows="3"
-              style={{ width: "100%" }}
-              placeholder="Write a comment..."
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-            />
-            <button onClick={handleAddComment}>Post Comment</button>
-          </>
-        )}
-      </div>
+
+      {!currentUser ? (
+        <div style={{ marginBottom: "15px" }}>
+          <input
+            type="text"
+            placeholder="Username"
+            value={loginUsername}
+            onChange={(e) => setLoginUsername(e.target.value)}
+            style={{ marginBottom: "10px", width: "300px" }}
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={loginEmail}
+            onChange={(e) => setLoginEmail(e.target.value)}
+            style={{ marginBottom: "10px", width: "300px" }}
+          />
+          <button onClick={handleLogin}>Login</button>
+        </div>
+      ) : (
+        <>
+          {replyTo && (
+            <div style={{ marginBottom: "8px" }}>
+              Replying to comment ID: {replyTo}{" "}
+              <button onClick={() => setReplyTo(null)}>Cancel</button>
+            </div>
+          )}
+          <textarea
+            rows="3"
+            style={{ width: "100%" }}
+            placeholder="Write a comment..."
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+          />
+          <button onClick={handleAddComment}>Post Comment</button>
+        </>
+      )}
 
       {errorMessage && <div style={{ color: "red" }}>{errorMessage}</div>}
 
