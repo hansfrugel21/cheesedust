@@ -1,4 +1,4 @@
-// ✅ Fresh Combined Index File with Login → Comments → Picks → Picks Table (Visible to All) + Own Pick Reveal Logic
+// ✅ Updated with Cheesedust design integration, styling, and conditional pick reveal
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -10,10 +10,8 @@ export default function Home() {
   const [existingUsers, setExistingUsers] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-
   const [teams, setTeams] = useState([]);
   const [tournamentDay, setTournamentDay] = useState("");
   const [pick, setPick] = useState("");
@@ -45,7 +43,7 @@ export default function Home() {
 
   const fetchExistingUsers = async () => {
     const { data } = await supabase.from("users").select("username, email");
-    setExistingUsers(data.sort((a, b) => a.username.localeCompare(b.username)));
+    setExistingUsers(data.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })));
   };
 
   const handleLogin = async () => {
@@ -100,7 +98,7 @@ export default function Home() {
         .from("teams")
         .select("id, team_name")
         .in("id", teamIds);
-      setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name)));
+      setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
     } else {
       setTeams([]);
     }
@@ -148,91 +146,78 @@ export default function Home() {
     fetchSubmittedPicks();
   };
 
-  const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))].sort();
-  const days = [...new Set(picksTable.map((entry) => entry.tournament_day))].sort((a, b) => a - b);
+  const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+  const days = [...new Set(picksTable.map((entry) => entry.tournament_day))]
+    .sort((a, b) => a - b);
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
-      {/* LOGIN */}
+    <div style={{ background: "#fff8f0", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
       {!isLoggedIn && (
-        <div>
-          <h3>Login to Submit Picks and Comment</h3>
-          <select onChange={(e) => setUsername(e.target.value)}>
+        <div style={{ marginBottom: "30px" }}>
+          <h3 style={{ color: "#444" }}>Login to Submit Picks and Comment</h3>
+          <select style={{ padding: "10px", borderRadius: "5px", marginBottom: "10px" }} onChange={(e) => setUsername(e.target.value)}>
             <option value="">Select user</option>
             {existingUsers.map((user) => (
               <option key={user.username} value={user.username}>{user.username}</option>
             ))}
-          </select>
-          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <button onClick={handleLogin}>Login</button>
+          </select><br />
+          <input style={{ padding: "10px", width: "250px", borderRadius: "5px", marginBottom: "10px" }} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /><br />
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={handleLogin}>Login</button>
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
           {successMessage && <div style={{ color: "green", marginTop: "10px" }}>{successMessage}</div>}
         </div>
       )}
 
-      {/* COMMENTS */}
-      <h2>Comments</h2>
+      <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Comments</h2>
       {comments.map((comment) => (
-        <div key={comment.id} style={{ marginBottom: "10px" }}>
+        <div key={comment.id} style={{ marginBottom: "15px", background: "#fff", padding: "10px", borderRadius: "8px" }}>
           <b>{comment.username}</b>: {comment.comment_text}
           <div style={{ fontSize: "12px", color: "gray" }}>{new Date(comment.created_at).toLocaleString()}</div>
         </div>
       ))}
       {isLoggedIn && (
-        <div>
-          <textarea
-            rows="3"
-            style={{ width: "100%" }}
-            placeholder="Write a comment..."
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-          />
-          <button onClick={handleAddComment}>Post Comment</button>
+        <div style={{ marginBottom: "30px" }}>
+          <textarea rows="3" style={{ width: "100%", padding: "10px", borderRadius: "8px" }} placeholder="Write a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} />
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none", marginTop: "10px" }} onClick={handleAddComment}>Post Comment</button>
         </div>
       )}
 
-      {/* PICKS */}
       {isLoggedIn && (
-        <div>
-          <h2>Make Your Pick</h2>
-          <select onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
+        <div style={{ marginBottom: "30px" }}>
+          <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Make Your Pick</h2>
+          <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
             <option value="">Select Day</option>
-            {[...Array(10)].map((_, i) => (
-              <option key={i + 1} value={i + 1}>Day {i + 1}</option>
-            ))}
+            {[...Array(10)].map((_, i) => (<option key={i + 1} value={i + 1}>Day {i + 1}</option>))}
           </select>
-          <select onChange={(e) => setPick(e.target.value)} value={pick}>
+          <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setPick(e.target.value)} value={pick}>
             <option value="">Select Team</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>{team.team_name}</option>
-            ))}
+            {teams.map((team) => (<option key={team.id} value={team.id}>{team.team_name}</option>))}
           </select>
-          <button onClick={submitPick}>Submit Pick</button>
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={submitPick}>Submit Pick</button>
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
         </div>
       )}
 
-      {/* PICK TABLE */}
-      <h2>Submitted Picks</h2>
-      <table border="1" cellPadding="5" style={{ borderCollapse: "collapse" }}>
+      <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Submitted Picks</h2>
+      <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff" }}>
         <thead>
-          <tr>
-            <th>Username</th>
-            {days.map((day) => (
-              <th key={day}>Day {day}</th>
-            ))}
+          <tr style={{ backgroundColor: "#f4b942", color: "#fff" }}>
+            <th style={{ padding: "10px" }}>Username</th>
+            {days.map((day) => (<th key={day} style={{ padding: "10px" }}>Day {day}</th>))}
           </tr>
         </thead>
         <tbody>
-          {uniqueUsers.map((user) => (
-            <tr key={user}>
-              <td>{user}</td>
+          {uniqueUsers.map((user, idx) => (
+            <tr key={user} style={{ backgroundColor: idx % 2 === 0 ? "#fdf5e6" : "#fff" }}>
+              <td style={{ padding: "10px" }}>{user}</td>
               {days.map((day) => {
                 const pickEntry = picksTable.find(
                   (entry) => entry.username === user && entry.tournament_day === day
                 );
                 return (
-                  <td key={day}>
+                  <td style={{ padding: "10px" }} key={day}>
                     {pickEntry ? (
                       (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
                         ? pickEntry.teams.team_name
@@ -246,7 +231,7 @@ export default function Home() {
         </tbody>
       </table>
 
-      {isLoggedIn && <button onClick={() => setIsLoggedIn(false)}>Logout</button>}
+      {isLoggedIn && <button style={{ marginTop: "20px", backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={() => setIsLoggedIn(false)}>Logout</button>}
     </div>
   );
 }
