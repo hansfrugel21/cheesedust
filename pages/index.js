@@ -19,7 +19,11 @@ export default function Home() {
 
   useEffect(() => {
     fetchExistingUsers();
+    fetchSubmittedPicks();
+    checkGameStatus();
+  }, []);
 
+  useEffect(() => {
     const fetchTeamsForDay = async () => {
       if (!tournamentDay) {
         setTeams([]);
@@ -36,28 +40,20 @@ export default function Home() {
           .from("teams")
           .select("id, team_name")
           .in("id", teamIds);
-        setTeams(teamData);
+        const sortedTeams = teamData.sort((a, b) => a.team_name.localeCompare(b.team_name));
+        setTeams(sortedTeams);
       } else {
         setTeams([]);
       }
     };
-
     fetchTeamsForDay();
   }, [tournamentDay]);
 
-  useEffect(() => {
-    fetchExistingUsers();
-    fetchSubmittedPicks();
-    checkGameStatus();
-  }, []);
-
   const checkGameStatus = () => {
-    // Example: Map of tournament day -> first game time
     const firstGameTimes = {
       1: new Date("2025-03-20T12:00:00"),
-      2: new Date("2025-03-20T12:00:00"),
+      2: new Date("2025-03-21T12:00:00"),
       3: new Date("2025-03-22T12:00:00")
-      // Add more days as needed
     };
     const currentTime = new Date();
     const newGameStartedDays = {};
@@ -69,7 +65,7 @@ export default function Home() {
 
   const fetchExistingUsers = async () => {
     const { data, error } = await supabase.from("users").select("username, email");
-    if (!error) setExistingUsers(data);
+    if (!error) setExistingUsers(data.sort((a, b) => a.username.localeCompare(b.username)));
   };
 
   const fetchSubmittedPicks = async () => {
@@ -135,6 +131,10 @@ export default function Home() {
       setErrorMessage("Please select a team and day.");
       return;
     }
+    if (gameStartedDays[tournamentDay]) {
+      setErrorMessage("Pick submission closed for this day.");
+      return;
+    }
     await supabase.from("picks").insert([
       {
         user_id: currentUser.id,
@@ -147,50 +147,6 @@ export default function Home() {
     fetchSubmittedPicks();
   };
 
-  const autoPickForUsers = async () => {
-    const { data: users } = await supabase.from("users").select("id, username");
-    const { data: picksToday } = await supabase
-      .from("picks")
-      .select("username")
-      .eq("tournament_day", tournamentDay);
-
-    const pickedUsernames = picksToday?.map((p) => p.username) || [];
-
-    for (const user of users) {
-      if (!pickedUsernames.includes(user.username)) {
-        const { data: userPicks } = await supabase
-          .from("picks")
-          .select("team_id")
-          .eq("username", user.username);
-        const pickedTeams = userPicks.map((p) => p.team_id);
-
-        const { data: scheduledTeams } = await supabase
-          .from("team_schedule")
-          .select("team_id, seed, ap_rank")
-          .eq("tournament_day", tournamentDay)
-          .order("seed", { ascending: true })
-          .order("ap_rank", { ascending: true });
-
-        const teamToPick = scheduledTeams.find(
-          (team) => !pickedTeams.includes(team.team_id)
-        );
-
-        if (teamToPick) {
-          await supabase.from("picks").insert([
-            {
-              user_id: user.id,
-              username: user.username,
-              team_id: teamToPick.team_id,
-              tournament_day: parseInt(tournamentDay, 10),
-              date: new Date().toISOString(),
-            },
-          ]);
-        }
-      }
-    }
-    fetchSubmittedPicks();
-  };
-
   const handleLogout = () => {
     setCurrentUser(null);
     setIsLoggedIn(false);
@@ -198,17 +154,21 @@ export default function Home() {
     setTeams([]);
   };
 
+  // Generate the unique list of users for the picks table
+  const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))].sort();
+  const days = [...new Set(picksTable.map((entry) => entry.tournament_day))].sort((a, b) => a - b);
+
   return (
-    <div style={{ padding: "20px" }}>
-      {!isLoggedIn ? (
+    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
+      {!isLoggedIn && (
         <div>
-          <div hidden><h2>Sign Up</h2>
+          <h2>Sign Up</h2>
           <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
           <input placeholder="Venmo ID" value={venmo} onChange={(e) => setVenmo(e.target.value)} />
-          <button onClick={handleSignUp}>Sign Up</button></div>
+          <button onClick={handleSignUp}>Sign Up</button>
 
-          <h3>Login</h3>
+          <h3>Or Login</h3>
           <select onChange={(e) => setUsername(e.target.value)}>
             <option value="">Select user</option>
             {existingUsers.map((user) => (
@@ -221,7 +181,9 @@ export default function Home() {
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
           {successMessage && <div style={{ color: "green", marginTop: "10px" }}>{successMessage}</div>}
         </div>
-      ) : (
+      )}
+
+      {isLoggedIn && (
         <div>
           <h2>Make Your Pick</h2>
           <select onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
@@ -241,22 +203,41 @@ export default function Home() {
           <button onClick={submitPick}>Submit Pick</button>
 
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
-
-          <h2>Submitted Picks</h2>
-          <ul>
-            {picksTable.map((entry, idx) => (
-              <li key={idx}>
-                {entry.username} - Day {entry.tournament_day} - {
-                  (gameStartedDays[entry.tournament_day] || previewMode) ? entry.teams.team_name : "Submitted"
-                }
-              </li>
-            ))}
-          </ul>
-
-          <button onClick={handleLogout}>Logout</button>
         </div>
       )}
+
+      <h2>Submitted Picks</h2>
+      <table border="1" cellPadding="5" style={{ borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th>Username</th>
+            {days.map((day) => (
+              <th key={day}>Day {day}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {uniqueUsers.map((user) => (
+            <tr key={user}>
+              <td>{user}</td>
+              {days.map((day) => {
+                const pickEntry = picksTable.find(
+                  (entry) => entry.username === user && entry.tournament_day === day
+                );
+                return (
+                  <td key={day}>
+                    {pickEntry ? (
+                      (gameStartedDays[day] || previewMode) ? pickEntry.teams.team_name : "Submitted"
+                    ) : ""}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {isLoggedIn && <button onClick={handleLogout}>Logout</button>}
     </div>
   );
 }
-
