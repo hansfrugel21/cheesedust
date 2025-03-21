@@ -1,5 +1,3 @@
-// ✅ FINAL Combined Index Code: Comments + Picks Logic - FIXED with Missing Functions Restored
-
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
@@ -19,53 +17,35 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState("");
-  const [replyTo, setReplyTo] = useState(null);
-
   useEffect(() => {
     fetchExistingUsers();
     fetchSubmittedPicks();
-    fetchComments();
     checkGameStatus();
   }, []);
 
-  const fetchComments = async () => {
-    const { data, error } = await supabase
-      .from("comments")
-      .select("id, username, user_id, comment_text, created_at, parent_id")
-      .order("created_at", { ascending: true });
-    if (error) {
-      console.error("Fetch Comments Error:", error);
-      return;
-    }
-    setComments(data || []);
-  };
-
-  const fetchTeamsForDay = async () => {
-    if (!tournamentDay) {
-      setTeams([]);
-      return;
-    }
-    const { data: scheduleData } = await supabase
-      .from("team_schedule")
-      .select("team_id")
-      .eq("tournament_day", tournamentDay);
-
-    if (scheduleData?.length) {
-      const teamIds = scheduleData.map((entry) => entry.team_id);
-      const { data: teamData } = await supabase
-        .from("teams")
-        .select("id, team_name")
-        .in("id", teamIds);
-      const sortedTeams = teamData.sort((a, b) => a.team_name.localeCompare(b.team_name));
-      setTeams(sortedTeams);
-    } else {
-      setTeams([]);
-    }
-  };
-
   useEffect(() => {
+    const fetchTeamsForDay = async () => {
+      if (!tournamentDay) {
+        setTeams([]);
+        return;
+      }
+      const { data: scheduleData } = await supabase
+        .from("team_schedule")
+        .select("team_id")
+        .eq("tournament_day", tournamentDay);
+
+      if (scheduleData?.length) {
+        const teamIds = scheduleData.map((entry) => entry.team_id);
+        const { data: teamData } = await supabase
+          .from("teams")
+          .select("id, team_name")
+          .in("id", teamIds);
+        const sortedTeams = teamData.sort((a, b) => a.team_name.localeCompare(b.team_name));
+        setTeams(sortedTeams);
+      } else {
+        setTeams([]);
+      }
+    };
     fetchTeamsForDay();
   }, [tournamentDay]);
 
@@ -174,6 +154,90 @@ export default function Home() {
     setTeams([]);
   };
 
-  // Additional Comments logic, posting, deleting, rendering can follow here as needed
+  // Generate the unique list of users for the picks table
+  const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))].sort();
+  const days = [...new Set(picksTable.map((entry) => entry.tournament_day))].sort((a, b) => a - b);
 
+  return (
+    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
+      {!isLoggedIn && (
+        <div><div hidden>
+          <h2>Sign Up</h2>
+          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input placeholder="Venmo ID" value={venmo} onChange={(e) => setVenmo(e.target.value)} />
+          <button onClick={handleSignUp}>Sign Up</button></div>
+
+          <h3>Login to submit picks</h3>
+          <select onChange={(e) => setUsername(e.target.value)}>
+            <option value="">Select user</option>
+            {existingUsers.map((user) => (
+              <option key={user.username} value={user.username}>{user.username}</option>
+            ))}
+          </select>
+          <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <button onClick={handleLogin}>Login</button>
+
+          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+          {successMessage && <div style={{ color: "green", marginTop: "10px" }}>{successMessage}</div>}
+        </div>
+      )}
+
+      {isLoggedIn && (
+        <div>
+          <h2>Make Your Pick</h2>
+          <select onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
+            <option value="">Select Day</option>
+            {[...Array(10)].map((_, i) => (
+              <option key={i + 1} value={i + 1}>Day {i + 1}</option>
+            ))}
+          </select>
+
+          <select onChange={(e) => setPick(e.target.value)} value={pick}>
+            <option value="">Select Team</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>{team.team_name}</option>
+            ))}
+          </select>
+
+          <button onClick={submitPick}>Submit Pick</button>
+
+          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+        </div>
+      )}
+
+      <h2>Submitted Picks</h2>
+      <table border="1" cellPadding="5" style={{ borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th>Username</th>
+            {days.map((day) => (
+              <th key={day}>Day {day}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {uniqueUsers.map((user) => (
+            <tr key={user}>
+              <td>{user}</td>
+              {days.map((day) => {
+                const pickEntry = picksTable.find(
+                  (entry) => entry.username === user && entry.tournament_day === day
+                );
+                return (
+                  <td key={day}>
+                    {pickEntry ? (
+                      (gameStartedDays[day] || previewMode) ? pickEntry.teams.team_name : "Submitted"
+                    ) : ""}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {isLoggedIn && <button onClick={handleLogout}>Logout</button>}
+    </div>
+  );
 }
