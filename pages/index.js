@@ -175,7 +175,7 @@ export default function Home() {
     .sort((a, b) => a - b);
 
   return (
-    <div style={{ background: "#fff8f0", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
+    <div style={{ background: "transparent", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
       {!isLoggedIn && (
         <div style={{ marginBottom: "30px" }}>
           <h3 style={{ color: "#444" }}>Login to Submit Picks and Comment</h3>
