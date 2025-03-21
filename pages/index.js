@@ -55,7 +55,7 @@ export default function Home() {
     // Example: Map of tournament day -> first game time
     const firstGameTimes = {
       1: new Date("2025-03-20T12:00:00"),
-      2: new Date("2025-03-21T12:00:00"),
+      2: new Date("2025-03-20T12:00:00"),
       3: new Date("2025-03-22T12:00:00")
       // Add more days as needed
     };
