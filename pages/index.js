@@ -30,6 +30,18 @@ export default function Home() {
     checkGameStatus();
   }, []);
 
+  const fetchComments = async () => {
+    const { data, error } = await supabase
+      .from("comments")
+      .select("id, username, user_id, comment_text, created_at, parent_id")
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("Fetch Comments Error:", error);
+      return;
+    }
+    setComments(data || []);
+  };
+
   const fetchTeamsForDay = async () => {
     if (!tournamentDay) {
       setTeams([]);
@@ -162,7 +174,6 @@ export default function Home() {
     setTeams([]);
   };
 
-  // Existing Comment logic + Picks table rendering below remain unchanged
+  // Additional Comments logic, posting, deleting, rendering can follow here as needed
 
-  // (The rest of your canvas code stays as-is)
 }
