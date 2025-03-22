@@ -6,6 +6,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Helper function to handle upsert batch
+async function batchUpsertGames(upsertData) {
+  if (upsertData.length === 0) return;
+  const { error } = await supabase
+    .from("games")
+    .upsert(upsertData, { onConflict: "tournament_day,winning_api_team" });
+  return error;
+}
+
 export default async function handler(req, res) {
   try {
     console.log("✅ Starting updateGames API");
@@ -34,10 +43,13 @@ export default async function handler(req, res) {
     let skippedCount = 0;
     let failCount = 0;
 
-    const upsertData = []; // Array to hold upsert data
+    const batchSize = 5; // Set batch size to process fewer records at a time
+    const upsertBatch = [];
 
     // Process each game record
-    for (const game of gameData) {
+    for (let i = 0; i < gameData.length; i++) {
+      const game = gameData[i];
+
       if (!game.completed || !game.scores || game.scores.length !== 2) {
         console.log(`⏩ Skipping incomplete game: ${game.id}`, game);
         skippedCount++;
@@ -86,26 +98,36 @@ export default async function handler(req, res) {
       // Format the updated time
       const formattedUpdatedAt = new Date().toISOString().replace('T', ' ').split('.')[0];
 
-      upsertData.push({
+      upsertBatch.push({
         tournament_day,
         winning_api_team: winner,
         winning_team_id: winner === game.home_team ? homeAlias.team_id : awayAlias.team_id,
         updated_at: formattedUpdatedAt,
       });
+
+      // Process batch when batch size is reached
+      if (upsertBatch.length >= batchSize) {
+        const error = await batchUpsertGames(upsertBatch);
+        if (error) {
+          console.error("❌ Error during batch upsert", error);
+          failCount++;
+        } else {
+          console.log(`✅ Batch of ${upsertBatch.length} games successfully upserted`);
+          successCount += upsertBatch.length;
+        }
+        upsertBatch.length = 0; // Clear the batch
+      }
     }
 
-    if (upsertData.length > 0) {
-      // Perform the batch upsert for all games
-      const { error: upsertError } = await supabase
-        .from("games")
-        .upsert(upsertData, { onConflict: "tournament_day,winning_api_team" });
-
-      if (upsertError) {
-        console.error("❌ Upsert failed", upsertError);
-        failCount += upsertData.length;
+    // Final batch processing if any records are left
+    if (upsertBatch.length > 0) {
+      const error = await batchUpsertGames(upsertBatch);
+      if (error) {
+        console.error("❌ Error during final batch upsert", error);
+        failCount++;
       } else {
-        console.log(`✅ Successfully upserted ${upsertData.length} games`);
-        successCount += upsertData.length;
+        console.log(`✅ Final batch of ${upsertBatch.length} games successfully upserted`);
+        successCount += upsertBatch.length;
       }
     }
 
