@@ -19,9 +19,10 @@ export default async function handler(req, res) {
   try {
     console.log("✅ Starting updateGames API");
 
-    // Fetch NCAA basketball scores from Odds API
+    // Fetch NCAA basketball scores from Odds API with timeout (10 seconds)
     const response = await fetch(
-      `https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}&daysFrom=3`
+      `https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}&daysFrom=3`, 
+      { timeout: 10000 }  // Timeout after 10 seconds
     );
 
     if (response.status !== 200) {
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
     let skippedCount = 0;
     let failCount = 0;
 
-    const batchSize = 5; // Set batch size to process fewer records at a time
+    const batchSize = 1; // Set batch size to 1 to ensure each game is processed one by one
     const upsertBatch = [];
 
     // Process each game record
