@@ -70,9 +70,8 @@ export default async function handler(req, res) {
         .single();
 
       if (homeAliasError || awayAliasError || !homeAlias || !awayAlias) {
-        // Log the missing alias, but continue processing other games
         console.warn(`⚠️ No alias mapping found for teams: ${game.home_team}, ${game.away_team}`);
-        failCount++;  // Increment fail count, but do not stop execution
+        failCount++;
         continue;
       }
 
