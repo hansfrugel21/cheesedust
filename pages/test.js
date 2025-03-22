@@ -11,9 +11,9 @@ export default function Home() {
   const [teams, setTeams] = useState([]);
   const [picksTable, setPicksTable] = useState([]);
   const [gameStartedDays, setGameStartedDays] = useState({});
-  const [existingUsers, setExistingUsers] = useState([]); // Make sure this is initialized here
-  const [tournamentDay, setTournamentDay] = useState(null); // Initialize tournamentDay here
-  const [pick, setPick] = useState(""); // Initialize pick here
+  const [existingUsers, setExistingUsers] = useState([]);
+  const [tournamentDay, setTournamentDay] = useState("");
+  const [pick, setPick] = useState("");
 
   // State for handling comments
   const [comments, setComments] = useState([]);
@@ -233,13 +233,17 @@ export default function Home() {
                 const pickEntry = picksTable.find(
                   (entry) => entry.username === user && entry.tournament_day === day
                 );
+                const isEliminated = /* check if the user is eliminated based on the last pick */;
+
                 return (
                   <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
                     {pickEntry ? (
-                      (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
+                      gameStartedDays[day] || isLoggedIn
                         ? pickEntry.teams.team_name
                         : "Submitted"
-                    ) : ""}
+                    ) : (
+                      isEliminated ? "Eliminated" : ""
+                    )}
                   </td>
                 );
               })}
