@@ -1,4 +1,4 @@
-// ✅ Final full version with fixed elimination, comments restored, styled UI, and correct pick logic
+// ✅ Full Index File with Admin Trigger Button to Update Games
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -147,6 +147,13 @@ export default function Home() {
     fetchSubmittedPicks();
   };
 
+  // ✅ Admin Trigger for Game Update
+  const triggerGameUpdate = async () => {
+    const response = await fetch("/api/updateGames");
+    const data = await response.json();
+    alert(data.message || "Game update complete");
+  };
+
   const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))]
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const days = [...new Set(picksTable.map((entry) => entry.tournament_day))].sort((a, b) => a - b);
@@ -165,6 +172,13 @@ export default function Home() {
           <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "8px", border: "none", marginTop: "10px" }} onClick={handleLogin}>Login</button>
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
         </div>
+      )}
+
+      {/* ✅ Admin Button to Trigger Update */}
+      {isLoggedIn && currentUser?.username === 'admin' && (
+        <button onClick={triggerGameUpdate} style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "8px", border: "none", marginTop: "20px" }}>
+          Update Game Results
+        </button>
       )}
 
       <h3 style={{ color: "#4A2E12" }}>Comments</h3>
