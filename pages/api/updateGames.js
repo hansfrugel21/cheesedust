@@ -1,3 +1,5 @@
+// ✅ Updated /pages/api/updateGames.js with debugging and gameData response
+
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -7,49 +9,51 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   try {
-    const oddsRes = await fetch(
-      `https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}`
-    );
-    const games = await oddsRes.json();
+    const response = await fetch(`https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}`);
 
-    if (!Array.isArray(games)) throw new Error("Invalid NCAA data");
+    if (!response.ok) {
+      console.error("Failed to fetch NCAA data");
+      return res.status(500).json({ error: "Failed to fetch NCAA data" });
+    }
 
-    for (const game of games) {
-      const winner =
-        game.completed && game.home_team_score !== null && game.away_team_score !== null
-          ? game.home_team_score > game.away_team_score
-            ? game.home_team
-            : game.away_team
-          : null;
+    const gameData = await response.json();
 
-      if (!winner) continue;
+    for (const game of gameData) {
+      const apiWinner = game.scores?.home?.score > game.scores?.away?.score ? game.home_team : game.away_team;
 
-      const { data: alias } = await supabase
+      // Map API winner name to database team_id
+      const { data: alias, error: aliasError } = await supabase
         .from("team_aliases")
         .select("team_id")
-        .eq("alias_name", winner)
+        .eq("alias_name", apiWinner)
         .single();
 
-      if (!alias) {
-        console.log(`No alias mapping found for: ${winner}`);
+      if (aliasError || !alias) {
+        console.error(`Alias not found for ${apiWinner}`);
         continue;
       }
 
-      // Upsert into games table
-      await supabase.from("games").upsert(
-        {
-          tournament_day: 1, // Adjust if needed
-          winning_api_team: winner,
+      // Example: You might want to use a date-to-day mapping logic if needed
+      const tournamentDay = 1; // Adjust logic here if needed
+
+      // Upsert game result
+      const { error: upsertError } = await supabase
+        .from("games")
+        .upsert({
+          tournament_day: tournamentDay,
+          winning_api_team: apiWinner,
           winning_team_id: alias.team_id,
-          start_time: game.commence_time,
-        },
-        { onConflict: "winning_api_team" }
-      );
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "tournament_day,winning_api_team" });
+
+      if (upsertError) {
+        console.error("Failed to upsert game:", upsertError);
+      }
     }
 
-    res.status(200).json({ message: "Games table updated successfully" });
+    return res.status(200).json({ message: "Games updated successfully", gameData });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to update games table" });
+    console.error("Unexpected error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 }
