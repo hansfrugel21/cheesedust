@@ -20,12 +20,13 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log("NCAA API Response:", JSON.stringify(data, null, 2));
 
-    if (!data?.scoreboard?.games || !Array.isArray(data.scoreboard.games)) {
+    // ✅ Corrected: NCAA response has "games" at the root level
+    if (!data?.games || !Array.isArray(data.games)) {
       console.error("No games array found in API response");
       return res.status(500).json({ error: "Invalid NCAA API response format" });
     }
 
-    for (const game of data.scoreboard.games) {
+    for (const game of data.games) {
       const homeTeam = game.home;
       const awayTeam = game.away;
       const winner = homeTeam.winner ? homeTeam.names.short : awayTeam.winner ? awayTeam.names.short : null;
