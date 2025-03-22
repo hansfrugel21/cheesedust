@@ -1,3 +1,5 @@
+// ✅ Enhanced /pages/api/updateGames.js with robust score checks and detailed debugging
+
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -6,20 +8,14 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  console.log("✅ Starting updateGames API");
-
-  // DEBUG: Validate environment
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.ODDS_API_KEY) {
-    console.error("❌ Missing environment variables");
-    return res.status(500).json({ error: "Missing environment variables" });
-  }
-
   try {
+    console.log("✅ Starting updateGames API");
+
     const response = await fetch(
       `https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}&daysFrom=3`
     );
 
-    if (!response.ok) {
+    if (response.status !== 200) {
       console.error("❌ Odds API fetch failed with status:", response.status);
       return res.status(500).json({ error: "Failed to fetch NCAA data" });
     }
@@ -28,7 +24,7 @@ export default async function handler(req, res) {
 
     if (!Array.isArray(gameData)) {
       console.error("❌ Invalid API response format", gameData);
-      return res.status(500).json({ error: "Invalid NCAA data format" });
+      return res.status(500).json({ error: "Invalid NCAA data" });
     }
 
     console.log(`✅ Fetched ${gameData.length} game records`);
@@ -38,8 +34,14 @@ export default async function handler(req, res) {
     let failCount = 0;
 
     for (const game of gameData) {
-      if (!game.completed || !game.scores) {
-        console.log(`⏩ Skipping incomplete game: ${game.id}`);
+      if (!game.completed || !game.scores || !game.scores.home || !game.scores.away) {
+        console.log(`⏩ Skipping incomplete or malformed game: ${game.id}`);
+        skippedCount++;
+        continue;
+      }
+
+      if (typeof game.scores.home.score !== 'number' || typeof game.scores.away.score !== 'number') {
+        console.log(`⏩ Skipping game with missing scores: ${game.id}`);
         skippedCount++;
         continue;
       }
@@ -49,8 +51,9 @@ export default async function handler(req, res) {
           ? game.home_team
           : game.away_team;
 
-      console.log(`🏀 Game complete. Winner: ${winner}`);
+      console.log(`🏀 Game complete. Winner determined: ${winner}`);
 
+      // Map API team name to internal team_id
       const { data: alias, error: aliasError } = await supabase
         .from("team_aliases")
         .select("team_id")
@@ -63,15 +66,19 @@ export default async function handler(req, res) {
         continue;
       }
 
+      // Assign tournament day based on game date
       const gameDate = new Date(game.commence_time);
       let tournament_day = 1;
       if (gameDate >= new Date("2025-03-21T00:00:00Z")) tournament_day = 2;
       if (gameDate >= new Date("2025-03-22T00:00:00Z")) tournament_day = 3;
 
-      console.log("📥 Attempting Upsert:", {
+      const formattedUpdatedAt = new Date().toISOString().replace('T', ' ').split('.')[0];
+
+      console.log("📥 Upserting Game Record:", {
         tournament_day,
         winning_api_team: winner,
         winning_team_id: alias.team_id,
+        updated_at: formattedUpdatedAt,
       });
 
       const { error: upsertError } = await supabase
@@ -82,32 +89,31 @@ export default async function handler(req, res) {
               tournament_day,
               winning_api_team: winner,
               winning_team_id: alias.team_id,
-              updated_at: new Date().toISOString().replace('T', ' ').split('.')[0],
+              updated_at: formattedUpdatedAt,
             },
           ],
           { onConflict: "tournament_day,winning_api_team" }
         );
 
       if (upsertError) {
-        console.error(`❌ Upsert failed for ${winner}:`, upsertError);
+        console.error("❌ Upsert failed for", winner, upsertError);
         failCount++;
       } else {
-        console.log(`✅ Upsert success: ${winner} on Day ${tournament_day}`);
+        console.log(`✅ Successfully upserted: ${winner} on Day ${tournament_day}`);
         successCount++;
       }
     }
 
-    console.log(`✅ Update Complete - Success: ${successCount}, Skipped: ${skippedCount}, Failed: ${failCount}`);
+    console.log(`✅ Process complete - Success: ${successCount}, Skipped: ${skippedCount}, Failed: ${failCount}`);
 
-    return res.status(200).json({
-      message: "✅ Game results updated successfully",
-      successCount,
-      skippedCount,
+    return res.status(200).json({ 
+      message: "✅ Game results updated successfully", 
+      successCount, 
+      skippedCount, 
       failCount
     });
-
   } catch (err) {
-    console.error("❌ Caught Exception:", err);
-    return res.status(500).json({ error: err.message, stack: err.stack });
+    console.error("❌ UpdateGames API failed:", err);
+    return res.status(500).json({ error: "Failed to fetch or update game data" });
   }
 }
