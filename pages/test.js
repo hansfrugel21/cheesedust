@@ -226,26 +226,4 @@ export default function Home() {
           {uniqueUsers.map((user, idx) => (
             <tr key={user} style={{ backgroundColor: idx % 2 === 0 ? "#fdf5e6" : "#fff" }}>
               <td style={{ padding: "10px", border: "1px solid #ddd" }}>{user}</td>
-              {days.map((day) => {
-                const pickEntry = picksTable.find(
-                  (entry) => entry.username === user && entry.tournament_day === day
-                );
-                return (
-                  <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
-                    {pickEntry ? (
-                      (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
-                        ? pickEntry.teams.team_name
-                        : "Submitted"
-                    ) : ""}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {isLoggedIn && <button style={{ marginTop: "20px", backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={() => setIsLoggedIn(false)}>Logout</button>}
-    </div>
-  );
-}
+             
