@@ -32,15 +32,16 @@ export default async function handler(req, res) {
     let failCount = 0;
 
     for (const game of gameData) {
-      if (!game.completed || !game.scores) {
+      if (!game.completed || !game.scores || game.scores.length !== 2) {
         console.log(`⏩ Skipping incomplete game: ${game.id}`, game);
         skippedCount++;
         continue;
       }
 
-      const homeScore = game.scores?.home?.score;
-      const awayScore = game.scores?.away?.score;
+      const homeScore = game.scores?.find((score) => score.name === game.home_team)?.score;
+      const awayScore = game.scores?.find((score) => score.name === game.away_team)?.score;
 
+      // Check if both scores are available
       if (homeScore === undefined || awayScore === undefined) {
         console.warn(`⚠️ Missing score data for game ${game.id}`, game);
         failCount++;
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
       }
 
       const winner =
-        homeScore > awayScore ? game.home_team : game.away_team;
+        parseInt(homeScore) > parseInt(awayScore) ? game.home_team : game.away_team;
 
       console.log(`🏀 Game complete. Winner determined: ${winner}`);
 
