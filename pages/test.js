@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient"; // Ensure your supabaseClient is correctly configured
+import { supabase } from "../lib/supabaseClient";  // Ensure your supabaseClient is correctly configured
 
 export default function Home() {
   // State variables for managing user login and picks
@@ -12,6 +12,8 @@ export default function Home() {
   const [picksTable, setPicksTable] = useState([]);
   const [gameStartedDays, setGameStartedDays] = useState({});
   const [existingUsers, setExistingUsers] = useState([]); // Make sure this is initialized here
+  const [tournamentDay, setTournamentDay] = useState(null); // Initialize tournamentDay here
+  const [pick, setPick] = useState(""); // Initialize pick here
 
   // State for handling comments
   const [comments, setComments] = useState([]);
