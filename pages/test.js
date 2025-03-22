@@ -11,10 +11,13 @@ export default function Home() {
   const [teams, setTeams] = useState([]);
   const [picksTable, setPicksTable] = useState([]);
   const [gameStartedDays, setGameStartedDays] = useState({});
-
+  
   // State for handling comments
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
+  
+  // State for existing users (to be fetched from Supabase)
+  const [existingUsers, setExistingUsers] = useState([]);
 
   // Fetch existing users on initial load
   useEffect(() => {
