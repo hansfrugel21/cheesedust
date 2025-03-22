@@ -175,7 +175,7 @@ export default function Home() {
       )}
 
       {/* ✅ Admin Button to Trigger Update */}
-      {isLoggedIn && currentUser?.username === 'admin' && (
+      {isLoggedIn && currentUser?.username === 'Admin' && (
         <button onClick={triggerGameUpdate} style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "8px", border: "none", marginTop: "20px" }}>
           Update Game Results
         </button>
