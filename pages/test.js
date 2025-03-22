@@ -240,6 +240,10 @@ export default function Home() {
                         ? pickEntry.teams.team_name
                         : "Submitted"
                     ) : ""}
+useEffect(() => {
+  console.log(picksTable); // Log to check if picksTable contains correct data
+}, [picksTable]);
+
                     {/* Only show "Eliminated" starting from Day 2 */}
                     {pickEntry && pickEntry.eliminated && pickEntry.tournament_day > 1 && (
                       <span>Eliminated</span>
