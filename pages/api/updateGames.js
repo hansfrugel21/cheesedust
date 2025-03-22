@@ -6,23 +6,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Helper function to handle upsert batch
-async function batchUpsertGames(upsertData) {
-  if (upsertData.length === 0) return;
-  const { error } = await supabase
-    .from("games")
-    .upsert(upsertData, { onConflict: "tournament_day,winning_api_team" });
-  return error;
-}
-
 export default async function handler(req, res) {
   try {
     console.log("✅ Starting updateGames API");
 
-    // Fetch NCAA basketball scores from Odds API with timeout (10 seconds)
+    // Fetch NCAA basketball scores from Odds API
     const response = await fetch(
-      `https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}&daysFrom=3`, 
-      { timeout: 10000 }  // Timeout after 10 seconds
+      `https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}&daysFrom=3`
     );
 
     if (response.status !== 200) {
@@ -44,13 +34,8 @@ export default async function handler(req, res) {
     let skippedCount = 0;
     let failCount = 0;
 
-    const batchSize = 1; // Set batch size to 1 to ensure each game is processed one by one
-    const upsertBatch = [];
-
     // Process each game record
-    for (let i = 0; i < gameData.length; i++) {
-      const game = gameData[i];
-
+    for (const game of gameData) {
       if (!game.completed || !game.scores || game.scores.length !== 2) {
         console.log(`⏩ Skipping incomplete game: ${game.id}`, game);
         skippedCount++;
@@ -85,8 +70,9 @@ export default async function handler(req, res) {
         .single();
 
       if (homeAliasError || awayAliasError || !homeAlias || !awayAlias) {
+        // Log the missing alias, but continue processing other games
         console.warn(`⚠️ No alias mapping found for teams: ${game.home_team}, ${game.away_team}`);
-        failCount++;
+        failCount++;  // Increment fail count, but do not stop execution
         continue;
       }
 
@@ -99,40 +85,38 @@ export default async function handler(req, res) {
       // Format the updated time
       const formattedUpdatedAt = new Date().toISOString().replace('T', ' ').split('.')[0];
 
-      upsertBatch.push({
+      console.log("📥 Upserting Game Record:", {
         tournament_day,
         winning_api_team: winner,
         winning_team_id: winner === game.home_team ? homeAlias.team_id : awayAlias.team_id,
         updated_at: formattedUpdatedAt,
       });
 
-      // Process batch when batch size is reached
-      if (upsertBatch.length >= batchSize) {
-        const error = await batchUpsertGames(upsertBatch);
-        if (error) {
-          console.error("❌ Error during batch upsert", error);
-          failCount++;
-        } else {
-          console.log(`✅ Batch of ${upsertBatch.length} games successfully upserted`);
-          successCount += upsertBatch.length;
-        }
-        upsertBatch.length = 0; // Clear the batch
-      }
-    }
+      // Upsert game result in the Supabase database
+      const { error: upsertError } = await supabase
+        .from("games")
+        .upsert(
+          [
+            {
+              tournament_day,
+              winning_api_team: winner,
+              winning_team_id: winner === game.home_team ? homeAlias.team_id : awayAlias.team_id,
+              updated_at: formattedUpdatedAt,
+            },
+          ],
+          { onConflict: "tournament_day,winning_api_team" }
+        );
 
-    // Final batch processing if any records are left
-    if (upsertBatch.length > 0) {
-      const error = await batchUpsertGames(upsertBatch);
-      if (error) {
-        console.error("❌ Error during final batch upsert", error);
+      if (upsertError) {
+        console.error("❌ Upsert failed for", winner, upsertError);
         failCount++;
       } else {
-        console.log(`✅ Final batch of ${upsertBatch.length} games successfully upserted`);
-        successCount += upsertBatch.length;
+        console.log(`✅ Successfully upserted: ${winner} on Day ${tournament_day}`);
+        successCount++;
       }
     }
 
-    // Return response with counts and game data table
+    // Return response with counts
     console.log(`✅ Process complete - Success: ${successCount}, Skipped: ${skippedCount}, Failed: ${failCount}`);
 
     return res.status(200).json({
