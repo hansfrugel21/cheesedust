@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
     for (const game of gameData) {
       if (!game.completed || !game.scores) {
-        console.log(`⏩ Skipping incomplete game: ${game.id}`);
+        console.log(`⏩ Skipping incomplete game: ${game.id}`, game);
         skippedCount++;
         continue;
       }
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       const awayScore = game.scores?.away?.score;
 
       if (homeScore === undefined || awayScore === undefined) {
-        console.warn(`⚠️ Missing score data for game ${game.id}`);
+        console.warn(`⚠️ Missing score data for game ${game.id}`, game);
         failCount++;
         continue;
       }
