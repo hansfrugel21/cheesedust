@@ -116,7 +116,7 @@ export default function Home() {
       const teamIds = scheduleData.map((entry) => entry.team_id);
       const { data: teamData } = await supabase
         .from("teams")
-        .select("id, team_name")
+        .select("id, team_name, eliminated")  // Make sure to fetch the 'eliminated' flag
         .in("id", teamIds);
       setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
     } else {
@@ -169,90 +169,4 @@ export default function Home() {
   const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))]
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
-  const days = [...new Set(picksTable.map((entry) => entry.tournament_day))]
-    .sort((a, b) => a - b);
-
-  return (
-    <div style={{ background: "transparent", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
-      {!isLoggedIn && (
-        <div style={{ marginBottom: "30px" }}>
-          <h3 style={{ color: "#444" }}>Login to Submit Picks and Comment</h3>
-          <select style={{ padding: "10px", borderRadius: "5px", marginBottom: "10px" }} onChange={(e) => setUsername(e.target.value)}>
-            <option value="">Select user</option>
-            {existingUsers.map((user) => (
-              <option key={user.username} value={user.username}>{user.username}</option>
-            ))}
-          </select><br />
-          <input style={{ padding: "10px", width: "250px", borderRadius: "5px", marginBottom: "10px" }} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /><br />
-          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={handleLogin}>Login</button>
-          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
-          {successMessage && <div style={{ color: "green", marginTop: "10px" }}>{successMessage}</div>}
-        </div>
-      )}
-
-      <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Comments</h2>
-      <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "10px" }}>
-        {renderComments()}
-      </div>
-      {isLoggedIn && (
-        <div style={{ marginBottom: "30px" }}>
-          <textarea rows="3" style={{ width: "100%", padding: "10px", borderRadius: "8px" }} placeholder="Write a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} />
-          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none", marginTop: "10px" }} onClick={() => handleAddComment(null)}>Post Comment</button>
-        </div>
-      )}
-
-      {isLoggedIn && (
-        <div style={{ marginBottom: "30px" }}>
-          <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Make Your Pick</h2>
-          <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
-            <option value="">Select Day</option>
-            {[...Array(10)].map((_, i) => (<option key={i + 1} value={i + 1}>Day {i + 1}</option>))}
-          </select>
-          <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setPick(e.target.value)} value={pick}>
-            <option value="">Select Team</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id} className={team.eliminated ? 'eliminated' : ''}>
-                {team.team_name}
-              </option>
-            ))}
-          </select>
-          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={submitPick}>Submit Pick</button>
-          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
-        </div>
-      )}
-
-      <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Submitted Picks</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff", border: "1px solid #ddd" }}>
-        <thead>
-          <tr style={{ backgroundColor: "#f4b942", color: "#fff" }}>
-            <th style={{ padding: "10px", border: "1px solid #ddd" }}>Username</th>
-            {days.map((day) => (<th key={day} style={{ padding: "10px", border: "1px solid #ddd" }}>Day {day}</th>))}
-          </tr>
-        </thead>
-        <tbody>
-          {uniqueUsers.map((user, idx) => (
-            <tr key={user} style={{ backgroundColor: idx % 2 === 0 ? "#fdf5e6" : "#fff" }}>
-              <td style={{ padding: "10px", border: "1px solid #ddd" }}>{user}</td>
-              {days.map((day) => {
-                const pickEntry = picksTable.find(
-                  (entry) => entry.username === user && entry.tournament_day === day
-                );
-                return (
-                  <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
-                    {pickEntry ? (
-                      (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
-                        ? pickEntry.teams.team_name
-                        : "Submitted"
-                    ) : ""}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {isLoggedIn && <button style={{ marginTop: "20px", backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={() => setIsLoggedIn(false)}>Logout</button>}
-    </div>
-  );
-}
+  const days =
