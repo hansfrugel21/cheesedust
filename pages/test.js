@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';  // Ensure your supabaseClient is correctly configured
+import { supabase } from '../lib/supabaseClient'; // Ensure your supabaseClient is correctly configured
 
 export default function Home() {
   // State variables for managing user login and picks
@@ -24,6 +24,7 @@ export default function Home() {
     fetchExistingUsers();
     fetchComments();
     checkGameStatus();
+    fetchSubmittedPicks();  // Fetch submitted picks when the page loads
   }, []);
 
   // Fetch all users for the login dropdown
@@ -148,6 +149,15 @@ export default function Home() {
     }
   };
 
+  // Fix Mississippi State issue (ensure the alias mapping is correct)
+  const fixTeamAliases = (teamName) => {
+    const aliasMap = {
+      "Mississippi State Bulldogs": "Mississippi State",  // Add any alias fixes here
+      // Add more team aliases if needed
+    };
+    return aliasMap[teamName] || teamName;
+  };
+
   // Fetch the submitted picks from users
   const fetchSubmittedPicks = async () => {
     try {
@@ -231,12 +241,21 @@ export default function Home() {
       {/* Pick Submission Section */}
       {isLoggedIn && (
         <div style={{ marginBottom: '30px' }}>
-          <textarea rows="3" style={{ width: '100%', padding: '10px', borderRadius: '8px' }} placeholder="Write a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} />
-          <button style={{ backgroundColor: '#f4b942', padding: '10px 20px', borderRadius: '5px', border: 'none', marginTop: '10px' }} onClick={() => handleAddComment(null)}>Post Comment</button>
+          <h2 style={{ borderBottom: '2px solid #f4b942', paddingBottom: '5px' }}>Make Your Pick</h2>
+          <select style={{ padding: '10px', borderRadius: '5px', marginRight: '10px' }} onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
+            <option value="">Select Day</option>
+            {[...Array(10)].map((_, i) => (<option key={i + 1} value={i + 1}>Day {i + 1}</option>))}
+          </select>
+          <select style={{ padding: '10px', borderRadius: '5px', marginRight: '10px' }} onChange={(e) => setPick(e.target.value)} value={pick}>
+            <option value="">Select Team</option>
+            {teams.map((team) => (<option key={team.id} value={team.id}>{team.team_name}</option>))}
+          </select>
+          <button style={{ backgroundColor: '#f4b942', padding: '10px 20px', borderRadius: '5px', border: 'none' }} onClick={submitPick}>Submit Pick</button>
+          {errorMessage && <div style={{ color: 'red', marginTop: '10px' }}>{errorMessage}</div>}
         </div>
       )}
 
-      {/* Picks Table */}
+      {/* Picks Table Section */}
       <h2 style={{ borderBottom: '2px solid #f4b942', paddingBottom: '5px' }}>Submitted Picks</h2>
       <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#fff', border: '1px solid #ddd' }}>
         <thead>
