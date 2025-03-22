@@ -172,6 +172,12 @@ export default function Home() {
   const days = [...new Set(picksTable.map((entry) => entry.tournament_day))]
     .sort((a, b) => a - b);
 
+  // Logic for determining if a user is eliminated
+  const isEliminated = (user, day) => {
+    const userPicks = picksTable.filter(entry => entry.username === user && entry.tournament_day === day);
+    return userPicks.length === 0; // User is eliminated if they have no pick for that day
+  };
+
   return (
     <div style={{ background: "transparent", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
       {!isLoggedIn && (
@@ -233,7 +239,7 @@ export default function Home() {
                 const pickEntry = picksTable.find(
                   (entry) => entry.username === user && entry.tournament_day === day
                 );
-                const isEliminated = /* check if the user is eliminated based on the last pick */;
+                const eliminated = isEliminated(user, day);
 
                 return (
                   <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
@@ -242,7 +248,7 @@ export default function Home() {
                         ? pickEntry.teams.team_name
                         : "Submitted"
                     ) : (
-                      isEliminated ? "Eliminated" : ""
+                      eliminated ? "Eliminated" : ""
                     )}
                   </td>
                 );
