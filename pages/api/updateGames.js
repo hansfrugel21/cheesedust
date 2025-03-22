@@ -1,55 +1,47 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default async function handler(req, res) {
   try {
-    console.log("Fetching NCAA game results from Odds API...");
+    const oddsRes = await fetch(`https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}`);
+    const games = await oddsRes.json();
 
-    const oddsResponse = await fetch(`https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}`);
-    if (!oddsResponse.ok) throw new Error("Failed to fetch from Odds API");
-    const games = await oddsResponse.json();
-
-    if (!Array.isArray(games) || games.length === 0) {
-      console.log("No games data returned from API.");
-      return res.status(200).json({ message: "No new games to process." });
-    }
+    if (!games || !Array.isArray(games)) throw new Error('Failed to fetch NCAA data');
 
     for (const game of games) {
-      const apiWinner = game.winner;
-      const gameDay = mapGameDateToDay(game.commence_time);
-      if (!apiWinner || !gameDay) continue;
+      // ✅ Adjust based on your Odds API structure
+      const winner = game.completed ? game.home_team_score > game.away_team_score ? game.home_team : game.away_team : null;
+      const startTime = game.commence_time;
+      const dayNumber = 1; // 🔄 Update this logic if you map dates to tournament days
 
-      const { data: alias, error: aliasError } = await supabase
-        .from('team_aliases')
-        .select('team_id')
-        .eq('alias_name', apiWinner)
+      if (!winner) continue;
+
+      // ✅ Map API winner name to your database's team_id
+      const { data: alias } = await supabase
+        .from("team_aliases")
+        .select("team_id")
+        .eq("alias_name", winner)
         .single();
 
-      if (aliasError || !alias) continue;
+      if (!alias) {
+        console.log(`No alias match found for ${winner}`);
+        continue;
+      }
 
-      const { error: rpcError } = await supabase.rpc('upsert_game_result', {
-        p_day: gameDay,
-        p_api_team_name: apiWinner,
-        p_team_id: alias.team_id,
-      });
-      if (rpcError) console.error(`RPC error for ${apiWinner}:`, rpcError);
+      await supabase
+        .from("games")
+        .upsert({
+          tournament_day: dayNumber,
+          winning_api_team: winner,
+          winning_team_id: alias.team_id,
+          start_time: startTime
+        }, { onConflict: 'winning_api_team' });
     }
 
-    res.status(200).json({ message: "Game results processed successfully." });
-  } catch (err) {
-    console.error("UpdateGames API Error:", err);
-    res.status(500).json({ error: "Failed to update games" });
+    res.status(200).json({ message: "Games updated successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch NCAA data" });
   }
-}
-
-function mapGameDateToDay(dateStr) {
-  const date = new Date(dateStr);
-  if (date.toISOString().startsWith("2025-03-20")) return 1;
-  if (date.toISOString().startsWith("2025-03-21")) return 2;
-  if (date.toISOString().startsWith("2025-03-22")) return 3;
-  return null;
 }
