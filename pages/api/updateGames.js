@@ -1,4 +1,4 @@
-// ✅ Refactored /pages/api/updateGames.js with explicit updated_at formatting, error handling, alias mapping check, dynamic tournament day, and logging
+// ✅ Enhanced /pages/api/updateGames.js with detailed debugging, success/failure counters, and structured logs
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -9,33 +9,43 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   try {
+    console.log("✅ Starting updateGames API");
+
     const response = await fetch(
       `https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}&daysFrom=3`
     );
 
     if (response.status !== 200) {
-      console.error("Odds API fetch failed with status:", response.status);
+      console.error("❌ Odds API fetch failed with status:", response.status);
       return res.status(500).json({ error: "Failed to fetch NCAA data" });
     }
 
     const gameData = await response.json();
 
     if (!Array.isArray(gameData)) {
-      console.error("Invalid API response format", gameData);
+      console.error("❌ Invalid API response format", gameData);
       return res.status(500).json({ error: "Invalid NCAA data" });
     }
 
-    console.log("Fetched game records:", gameData.length);
+    console.log(`✅ Fetched ${gameData.length} game records`);
+
+    let successCount = 0;
+    let skippedCount = 0;
+    let failCount = 0;
 
     for (const game of gameData) {
-      if (!game.completed || !game.scores) continue;
+      if (!game.completed || !game.scores) {
+        console.log(`⏩ Skipping incomplete game: ${game.id}`);
+        skippedCount++;
+        continue;
+      }
 
       const winner =
         game.scores.home.score > game.scores.away.score
           ? game.home_team
           : game.away_team;
 
-      console.log(`Evaluating winner: ${winner}`);
+      console.log(`🏀 Game complete. Winner determined: ${winner}`);
 
       // Map API team name to internal team_id
       const { data: alias, error: aliasError } = await supabase
@@ -45,7 +55,8 @@ export default async function handler(req, res) {
         .single();
 
       if (aliasError || !alias) {
-        console.warn(`No alias mapping found for: ${winner}`, aliasError);
+        console.warn(`⚠️ No alias mapping found for: ${winner}`, aliasError);
+        failCount++;
         continue;
       }
 
@@ -57,7 +68,7 @@ export default async function handler(req, res) {
 
       const formattedUpdatedAt = new Date().toISOString().replace('T', ' ').split('.')[0];
 
-      console.log("Upserting Game Record:", {
+      console.log("📥 Upserting Game Record:", {
         tournament_day,
         winning_api_team: winner,
         winning_team_id: alias.team_id,
@@ -76,19 +87,27 @@ export default async function handler(req, res) {
             },
           ],
           { onConflict: "tournament_day,winning_api_team" }
-        )
-        .select("tournament_day, winning_api_team, winning_team_id, updated_at");
+        );
 
       if (upsertError) {
-        console.error("Upsert failed for", winner, upsertError);
+        console.error("❌ Upsert failed for", winner, upsertError);
+        failCount++;
       } else {
-        console.log(`✅ Upserted: ${winner} on Day ${tournament_day}`);
+        console.log(`✅ Successfully upserted: ${winner} on Day ${tournament_day}`);
+        successCount++;
       }
     }
 
-    return res.status(200).json({ message: "✅ Game results updated successfully" });
+    console.log(`✅ Process complete - Success: ${successCount}, Skipped: ${skippedCount}, Failed: ${failCount}`);
+
+    return res.status(200).json({ 
+      message: "✅ Game results updated successfully", 
+      successCount, 
+      skippedCount, 
+      failCount
+    });
   } catch (err) {
-    console.error("UpdateGames API failed:", err);
+    console.error("❌ UpdateGames API failed:", err);
     return res.status(500).json({ error: "Failed to fetch or update game data" });
   }
 }
