@@ -1,4 +1,4 @@
-// ✅ Enhanced /pages/api/updateGames.js with robust score checks and detailed debugging
+// ✅ Enhanced /pages/api/updateGames.js with debugging and detailed logs
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -34,14 +34,12 @@ export default async function handler(req, res) {
     let failCount = 0;
 
     for (const game of gameData) {
+      // Check for game completion and scores presence
       if (!game.completed || !game.scores || !game.scores.home || !game.scores.away) {
-        console.log(`⏩ Skipping incomplete or malformed game: ${game.id}`);
-        skippedCount++;
-        continue;
-      }
-
-      if (typeof game.scores.home.score !== 'number' || typeof game.scores.away.score !== 'number') {
-        console.log(`⏩ Skipping game with missing scores: ${game.id}`);
+        console.log(`⏩ Skipping incomplete or invalid game: ${game.id}`, {
+          completed: game.completed,
+          scores: game.scores
+        });
         skippedCount++;
         continue;
       }
