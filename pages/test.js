@@ -274,11 +274,7 @@ export default function Home() {
                 return (
                   <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
                     {pickEntry ? (
-                      (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
-                        ? pickEntry.eliminated
-                          ? "Eliminated"
-                          : pickEntry.teams.team_name
-                        : "Submitted"
+                      pickEntry.eliminated ? "Eliminated" : pickEntry.teams.team_name
                     ) : ""}
                   </td>
                 );
