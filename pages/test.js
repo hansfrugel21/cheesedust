@@ -210,7 +210,11 @@ export default function Home() {
           </select>
           <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setPick(e.target.value)} value={pick}>
             <option value="">Select Team</option>
-            {teams.map((team) => (<option key={team.id} value={team.id}>{team.team_name}</option>))}
+            {teams.map((team) => (
+              <option key={team.id} value={team.id} className={team.eliminated ? 'eliminated' : ''}>
+                {team.team_name}
+              </option>
+            ))}
           </select>
           <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={submitPick}>Submit Pick</button>
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
@@ -240,12 +244,6 @@ export default function Home() {
                         ? pickEntry.teams.team_name
                         : "Submitted"
                     ) : ""}
-
-
-                    {/* Only show "Eliminated" starting from Day 2 */}
-                    {pickEntry && pickEntry.eliminated && pickEntry.tournament_day > 1 && (
-                      <span>Eliminated</span>
-                    )}
                   </td>
                 );
               })}
