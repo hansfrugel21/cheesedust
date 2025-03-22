@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
+// ✅ Initialize Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -7,46 +8,52 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   try {
-    // Example: Fetch API game results (replace with your API fetch logic)
-    const apiResponse = await fetch(`https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores`, {
-      headers: { 'Authorization': `Bearer ${process.env.ODDS_API_KEY}` }
-    });
+    console.log("Fetching NCAA game results from Odds API...");
 
-    const games = await apiResponse.json();
+    // ✅ Fetch results from Odds API (replace the URL with your working endpoint)
+    const oddsResponse = await fetch(`https://api.the-odds-api.com/v4/sports/basketball_ncaab/scores/?apiKey=${process.env.ODDS_API_KEY}`);
+    if (!oddsResponse.ok) throw new Error("Failed to fetch from Odds API");
+    const games = await oddsResponse.json();
 
-    // Loop through each game result from the API
+    if (!Array.isArray(games) || games.length === 0) {
+      console.log("No games data returned from API.");
+      return res.status(200).json({ message: "No new games to process." });
+    }
+
     for (const game of games) {
-      const apiWinner = game.winner_name;      // Adjust based on API structure
-      const gameDay = determineGameDay(game);  // Your logic to map date to day number
+      const apiWinner = game.winner; // ✅ Adjust this based on your API response structure
+      const gameDay = mapGameDateToDay(game.commence_time); // Replace with your logic
 
-      // ✅ Map API winner to your internal team_id
-      const { data: aliasMatch } = await supabase
+      if (!apiWinner || !gameDay) {
+        console.log(`Skipping incomplete game record:`, game);
+        continue;
+      }
+
+      // ✅ Find matching internal team_id using team_aliases
+      const { data: alias, error: aliasError } = await supabase
         .from('team_aliases')
         .select('team_id')
         .eq('alias_name', apiWinner)
         .single();
 
-      if (!aliasMatch) {
-        console.log(`No match found for API team: ${apiWinner}`);
+      if (aliasError || !alias) {
+        console.warn(`Alias not found for API team "${apiWinner}". Skipping.`);
         continue;
       }
 
-      // ✅ Call the PostgreSQL function to upsert
-      await supabase.rpc('upsert_game_result', {
+      console.log(`Upserting result: Day ${gameDay} Winner: ${apiWinner}`);
+
+      // ✅ Call your stored procedure to upsert the result
+      const { error: rpcError } = await supabase.rpc('upsert_game_result', {
         p_day: gameDay,
         p_api_team_name: apiWinner,
-        p_team_id: aliasMatch.team_id
+        p_team_id: alias.team_id,
       });
+
+      if (rpcError) {
+        console.error(`RPC error for ${apiWinner}:`, rpcError);
+      }
     }
 
-    return res.status(200).json({ message: 'Games updated successfully' });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Failed to update games' });
-  }
-}
-
-function determineGameDay(game) {
-  // Write logic to map game.date to your tournament_day (1, 2, 3, etc.)
-  return 1; // Example placeholder
-}
+    res.status(200).json({ message: "Game results processed successfully." });
+  } catch (err)
