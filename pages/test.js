@@ -1,4 +1,4 @@
-// ✅ Updated index.js to fix elimination logic bug and restore site styling from cheesedust.super.site
+// ✅ Updated index.js with correct elimination tracking per day, darker headers, and restored button styles matching cheesedust.super.site
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -17,7 +17,7 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-  const [eliminatedUsers, setEliminatedUsers] = useState([]);
+  const [eliminatedData, setEliminatedData] = useState([]); // {username, eliminatedOnDay}
 
   useEffect(() => {
     fetchExistingUsers();
@@ -93,8 +93,7 @@ export default function Home() {
       winnersByDay[r.tournament_day].add(r.winning_team_id);
     });
 
-    const userEliminated = new Set();
-
+    const eliminatedList = [];
     const userPicksByDay = {};
     picks.forEach((pick) => {
       if (!userPicksByDay[pick.username]) userPicksByDay[pick.username] = {};
@@ -105,20 +104,17 @@ export default function Home() {
       for (let day = 1; day <= Object.keys(winnersByDay).length; day++) {
         if (picksPerDay[day]) {
           if (!winnersByDay[day] || !winnersByDay[day].has(picksPerDay[day])) {
-            userEliminated.add(user);
+            eliminatedList.push({ username: user, eliminatedOnDay: day + 1 });
             break;
           }
-        } else {
-          // Auto-eliminate if no pick and games started
-          if (gameStartedDays[day]) {
-            userEliminated.add(user);
-            break;
-          }
+        } else if (gameStartedDays[day]) {
+          eliminatedList.push({ username: user, eliminatedOnDay: day + 1 });
+          break;
         }
       }
     });
 
-    setEliminatedUsers(Array.from(userEliminated));
+    setEliminatedData(eliminatedList);
   };
 
   const checkGameStatus = () => {
@@ -202,7 +198,7 @@ export default function Home() {
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif", background: "transparent", color: "#333" }}>
-      <h2 style={{ color: "#4A2E12", fontFamily: "Arial, sans-serif" }}>March Madness Pool</h2>
+      <h2 style={{ color: "#4A2E12" }}>March Madness Pool</h2>
 
       {!isLoggedIn && (
         <div>
@@ -245,7 +241,7 @@ export default function Home() {
 
       <h3 style={{ color: "#4A2E12" }}>Submitted Picks</h3>
       <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff" }}>
-        <thead style={{ backgroundColor: "#f4b942", color: "#fff" }}>
+        <thead style={{ backgroundColor: "#f4b942", color: "#222" }}>
           <tr>
             <th style={{ padding: "10px", border: "1px solid #ddd" }}>User</th>
             {days.map((day) => (
@@ -254,28 +250,31 @@ export default function Home() {
           </tr>
         </thead>
         <tbody>
-          {uniqueUsers.map((user, idx) => (
-            <tr key={idx} style={{ backgroundColor: eliminatedUsers.includes(user) ? "#eee" : "white" }}>
-              <td style={{ padding: "10px", border: "1px solid #ddd" }}>{user}</td>
-              {days.map((day) => {
-                const pickEntry = picksTable.find(
-                  (entry) => entry.username === user && entry.tournament_day === day
-                );
-                return (
-                  <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
-                    {eliminatedUsers.includes(user) && day > 1
-                      ? "Eliminated"
-                      : pickEntry
+          {uniqueUsers.map((user, idx) => {
+            const eliminated = eliminatedData.find(e => e.username === user);
+            return (
+              <tr key={idx} style={{ backgroundColor: eliminated ? "#eee" : "white" }}>
+                <td style={{ padding: "10px", border: "1px solid #ddd" }}>{user}</td>
+                {days.map((day) => {
+                  const pickEntry = picksTable.find(
+                    (entry) => entry.username === user && entry.tournament_day === day
+                  );
+                  if (eliminated && day >= eliminated.eliminatedOnDay) {
+                    return <td key={day} style={{ padding: "10px", border: "1px solid #ddd" }}>Eliminated</td>;
+                  }
+                  return (
+                    <td key={day} style={{ padding: "10px", border: "1px solid #ddd" }}>
+                      {pickEntry
                         ? (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
                           ? pickEntry.teams.team_name
                           : "Submitted"
-                        : ""
-                    }
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+                        : ""}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
