@@ -1,4 +1,4 @@
-// ✅ Updated index.js with elimination logic, threaded comments, dynamic dropdown, and full styling
+// ✅ Updated index.js to fix elimination logic bug and restore site styling from cheesedust.super.site
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -83,24 +83,42 @@ export default function Home() {
   const fetchEliminations = async () => {
     const { data: picks } = await supabase
       .from("picks")
-      .select("username, team_id")
+      .select("username, tournament_day, team_id")
       .order("tournament_day", { ascending: true });
 
-    const { data: results } = await supabase.from("games").select("winning_team_id");
-    const winners = results.map((g) => g.winning_team_id);
+    const { data: results } = await supabase.from("games").select("tournament_day, winning_team_id");
+    const winnersByDay = {};
+    results.forEach(r => {
+      if (!winnersByDay[r.tournament_day]) winnersByDay[r.tournament_day] = new Set();
+      winnersByDay[r.tournament_day].add(r.winning_team_id);
+    });
 
-    const eliminated = new Set();
-    const usersChecked = new Set();
+    const userEliminated = new Set();
 
+    const userPicksByDay = {};
     picks.forEach((pick) => {
-      if (!usersChecked.has(pick.username)) {
-        if (!winners.includes(pick.team_id)) {
-          eliminated.add(pick.username);
+      if (!userPicksByDay[pick.username]) userPicksByDay[pick.username] = {};
+      userPicksByDay[pick.username][pick.tournament_day] = pick.team_id;
+    });
+
+    Object.entries(userPicksByDay).forEach(([user, picksPerDay]) => {
+      for (let day = 1; day <= Object.keys(winnersByDay).length; day++) {
+        if (picksPerDay[day]) {
+          if (!winnersByDay[day] || !winnersByDay[day].has(picksPerDay[day])) {
+            userEliminated.add(user);
+            break;
+          }
+        } else {
+          // Auto-eliminate if no pick and games started
+          if (gameStartedDays[day]) {
+            userEliminated.add(user);
+            break;
+          }
         }
-        usersChecked.add(pick.username);
       }
     });
-    setEliminatedUsers(Array.from(eliminated));
+
+    setEliminatedUsers(Array.from(userEliminated));
   };
 
   const checkGameStatus = () => {
@@ -183,8 +201,8 @@ export default function Home() {
     .sort((a, b) => a - b);
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif", background: "transparent" }}>
-      <h2>March Madness Pool</h2>
+    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif", background: "transparent", color: "#333" }}>
+      <h2 style={{ color: "#4A2E12", fontFamily: "Arial, sans-serif" }}>March Madness Pool</h2>
 
       {!isLoggedIn && (
         <div>
@@ -200,14 +218,14 @@ export default function Home() {
         </div>
       )}
 
-      <h3>Comments</h3>
+      <h3 style={{ color: "#4A2E12" }}>Comments</h3>
       <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid #ccc", padding: "10px" }}>
         {renderComments()}
       </div>
 
       {isLoggedIn && (
         <div>
-          <h3>Make Your Pick</h3>
+          <h3 style={{ color: "#4A2E12" }}>Make Your Pick</h3>
           <select onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
             <option value="">Select Day</option>
             {[...Array(10)].map((_, i) => (
@@ -225,26 +243,26 @@ export default function Home() {
         </div>
       )}
 
-      <h3>Submitted Picks</h3>
-      <table border="1" cellPadding="5">
-        <thead>
+      <h3 style={{ color: "#4A2E12" }}>Submitted Picks</h3>
+      <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff" }}>
+        <thead style={{ backgroundColor: "#f4b942", color: "#fff" }}>
           <tr>
-            <th>User</th>
+            <th style={{ padding: "10px", border: "1px solid #ddd" }}>User</th>
             {days.map((day) => (
-              <th key={day}>Day {day}</th>
+              <th key={day} style={{ padding: "10px", border: "1px solid #ddd" }}>Day {day}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {uniqueUsers.map((user, idx) => (
             <tr key={idx} style={{ backgroundColor: eliminatedUsers.includes(user) ? "#eee" : "white" }}>
-              <td>{user}</td>
+              <td style={{ padding: "10px", border: "1px solid #ddd" }}>{user}</td>
               {days.map((day) => {
                 const pickEntry = picksTable.find(
                   (entry) => entry.username === user && entry.tournament_day === day
                 );
                 return (
-                  <td key={day}>
+                  <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
                     {eliminatedUsers.includes(user) && day > 1
                       ? "Eliminated"
                       : pickEntry
@@ -261,7 +279,7 @@ export default function Home() {
         </tbody>
       </table>
 
-      {isLoggedIn && <button onClick={() => setIsLoggedIn(false)}>Logout</button>}
+      {isLoggedIn && <button style={{ marginTop: "20px" }} onClick={() => setIsLoggedIn(false)}>Logout</button>}
     </div>
   );
 }
