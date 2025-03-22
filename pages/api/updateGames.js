@@ -34,6 +34,8 @@ export default async function handler(req, res) {
     let skippedCount = 0;
     let failCount = 0;
 
+    const upsertData = []; // Array to hold upsert data
+
     // Process each game record
     for (const game of gameData) {
       if (!game.completed || !game.scores || game.scores.length !== 2) {
@@ -84,38 +86,30 @@ export default async function handler(req, res) {
       // Format the updated time
       const formattedUpdatedAt = new Date().toISOString().replace('T', ' ').split('.')[0];
 
-      console.log("📥 Upserting Game Record:", {
+      upsertData.push({
         tournament_day,
         winning_api_team: winner,
         winning_team_id: winner === game.home_team ? homeAlias.team_id : awayAlias.team_id,
         updated_at: formattedUpdatedAt,
       });
+    }
 
-      // Upsert game result in the Supabase database
+    if (upsertData.length > 0) {
+      // Perform the batch upsert for all games
       const { error: upsertError } = await supabase
         .from("games")
-        .upsert(
-          [
-            {
-              tournament_day,
-              winning_api_team: winner,
-              winning_team_id: winner === game.home_team ? homeAlias.team_id : awayAlias.team_id,
-              updated_at: formattedUpdatedAt,
-            },
-          ],
-          { onConflict: "tournament_day,winning_api_team" }
-        );
+        .upsert(upsertData, { onConflict: "tournament_day,winning_api_team" });
 
       if (upsertError) {
-        console.error("❌ Upsert failed for", winner, upsertError);
-        failCount++;
+        console.error("❌ Upsert failed", upsertError);
+        failCount += upsertData.length;
       } else {
-        console.log(`✅ Successfully upserted: ${winner} on Day ${tournament_day}`);
-        successCount++;
+        console.log(`✅ Successfully upserted ${upsertData.length} games`);
+        successCount += upsertData.length;
       }
     }
 
-    // Return response with counts
+    // Return response with counts and game data table
     console.log(`✅ Process complete - Success: ${successCount}, Skipped: ${skippedCount}, Failed: ${failCount}`);
 
     return res.status(200).json({
