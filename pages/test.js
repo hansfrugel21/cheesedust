@@ -1,4 +1,4 @@
-// ✅ Restored latest index.js with threaded comments, proper team dropdown, and formatting
+// ✅ Updated index.js with elimination logic, threaded comments, dynamic dropdown, and full styling
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -17,17 +17,20 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
+  const [eliminatedUsers, setEliminatedUsers] = useState([]);
 
   useEffect(() => {
     fetchExistingUsers();
     fetchSubmittedPicks();
     fetchComments();
+    fetchEliminations();
     checkGameStatus();
 
     const interval = setInterval(() => {
       fetchSubmittedPicks();
+      fetchEliminations();
       checkGameStatus();
-    }, 60000); // Auto-refresh every 60s
+    }, 60000);
 
     return () => clearInterval(interval);
   }, []);
@@ -77,12 +80,27 @@ export default function Home() {
     setPicksTable(Object.values(latestPicks));
   };
 
-  const fetchComments = async () => {
-    const { data } = await supabase
-      .from("comments")
-      .select("id, username, comment_text, created_at, parent_id")
-      .order("created_at", { ascending: true });
-    setComments(data || []);
+  const fetchEliminations = async () => {
+    const { data: picks } = await supabase
+      .from("picks")
+      .select("username, team_id")
+      .order("tournament_day", { ascending: true });
+
+    const { data: results } = await supabase.from("games").select("winning_team_id");
+    const winners = results.map((g) => g.winning_team_id);
+
+    const eliminated = new Set();
+    const usersChecked = new Set();
+
+    picks.forEach((pick) => {
+      if (!usersChecked.has(pick.username)) {
+        if (!winners.includes(pick.team_id)) {
+          eliminated.add(pick.username);
+        }
+        usersChecked.add(pick.username);
+      }
+    });
+    setEliminatedUsers(Array.from(eliminated));
   };
 
   const checkGameStatus = () => {
@@ -138,6 +156,14 @@ export default function Home() {
     fetchSubmittedPicks();
   };
 
+  const fetchComments = async () => {
+    const { data } = await supabase
+      .from("comments")
+      .select("id, username, comment_text, created_at, parent_id")
+      .order("created_at", { ascending: true });
+    setComments(data || []);
+  };
+
   const renderComments = (parentId = null, level = 0) => {
     return comments
       .filter((c) => c.parent_id === parentId)
@@ -149,6 +175,12 @@ export default function Home() {
         </div>
       ));
   };
+
+  const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+  const days = [...new Set(picksTable.map((entry) => entry.tournament_day))]
+    .sort((a, b) => a - b);
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif", background: "transparent" }}>
@@ -198,20 +230,38 @@ export default function Home() {
         <thead>
           <tr>
             <th>User</th>
-            <th>Day</th>
-            <th>Team</th>
+            {days.map((day) => (
+              <th key={day}>Day {day}</th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {picksTable.map((entry, idx) => (
-            <tr key={idx}>
-              <td>{entry.username}</td>
-              <td>{entry.tournament_day}</td>
-              <td>{entry.teams.team_name}</td>
+          {uniqueUsers.map((user, idx) => (
+            <tr key={idx} style={{ backgroundColor: eliminatedUsers.includes(user) ? "#eee" : "white" }}>
+              <td>{user}</td>
+              {days.map((day) => {
+                const pickEntry = picksTable.find(
+                  (entry) => entry.username === user && entry.tournament_day === day
+                );
+                return (
+                  <td key={day}>
+                    {eliminatedUsers.includes(user) && day > 1
+                      ? "Eliminated"
+                      : pickEntry
+                        ? (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
+                          ? pickEntry.teams.team_name
+                          : "Submitted"
+                        : ""
+                    }
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
       </table>
+
+      {isLoggedIn && <button onClick={() => setIsLoggedIn(false)}>Logout</button>}
     </div>
   );
 }
