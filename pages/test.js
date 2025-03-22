@@ -172,6 +172,22 @@ export default function Home() {
   const days = [...new Set(picksTable.map((entry) => entry.tournament_day))]
     .sort((a, b) => a - b);
 
+const style = {
+  textDecoration: "line-through",
+  color: "gray",
+};
+
+// Inside your JSX
+<option
+  key={team.id}
+  value={team.id}
+  className={team.eliminated ? 'eliminated' : ''} 
+  style={team.eliminated ? style : {}}
+>
+  {team.team_name}
+</option>
+
+
   return (
     <div style={{ background: "transparent", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
       {!isLoggedIn && (
