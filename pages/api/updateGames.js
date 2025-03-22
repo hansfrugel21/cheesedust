@@ -8,22 +8,24 @@ const NCAA_JSON_URL = "https://data.ncaa.com/casablanca/game-center/basketball-m
 export default async function handler(req, res) {
   try {
     const date = new Date().toISOString().split("T")[0].replace(/-/g, "");
-    const response = await fetch(NCAA_JSON_URL.replace("{DATE}", date));
+    const fetchUrl = NCAA_JSON_URL.replace("{DATE}", date);
+    const response = await fetch(fetchUrl);
 
     if (!response.ok) {
-      console.error("Failed to fetch NCAA data");
+      const errorText = await response.text();
+      console.error(`Failed to fetch NCAA data: ${response.status} ${response.statusText} - ${errorText}`);
       return res.status(500).json({ error: "Failed to fetch NCAA data" });
     }
 
     const data = await response.json();
     console.log("NCAA API Response:", JSON.stringify(data, null, 2));
 
-    if (!data?.games || !Array.isArray(data.games)) {
+    if (!data?.scoreboard?.games || !Array.isArray(data.scoreboard.games)) {
       console.error("No games array found in API response");
       return res.status(500).json({ error: "Invalid NCAA API response format" });
     }
 
-    for (const game of data.games) {
+    for (const game of data.scoreboard.games) {
       const homeTeam = game.home;
       const awayTeam = game.away;
       const winner = homeTeam.winner ? homeTeam.names.short : awayTeam.winner ? awayTeam.names.short : null;
@@ -46,8 +48,7 @@ export default async function handler(req, res) {
           await supabase.from("teams").update({ eliminated: true }).eq("id", loserRecord.data.id);
 
           // Eliminate users who picked the losing team
-          await supabase.from("picks").update({ eliminated: true })
-            .eq("team_id", loserRecord.data.id);
+          await supabase.from("picks").update({ eliminated: true }).eq("team_id", loserRecord.data.id);
         }
       }
     }
