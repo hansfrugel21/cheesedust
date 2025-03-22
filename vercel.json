@@ -1,0 +1,9 @@
+{
+  "cron": [
+    {
+      "path": "/api/updateGames",
+      "schedule": "0 12,18,23 * * *",
+      "timezone": "America/New_York"
+    }
+  ]
+}
