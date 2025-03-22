@@ -1,4 +1,4 @@
-// ✅ Full index.js code with auto-refresh, auto-pick fallback logic, and UI rendering
+// ✅ Restored latest index.js with threaded comments, proper team dropdown, and formatting
 
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -15,16 +15,19 @@ export default function Home() {
   const [picksTable, setPicksTable] = useState([]);
   const [gameStartedDays, setGameStartedDays] = useState({});
   const [errorMessage, setErrorMessage] = useState("");
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
 
   useEffect(() => {
     fetchExistingUsers();
     fetchSubmittedPicks();
+    fetchComments();
     checkGameStatus();
 
     const interval = setInterval(() => {
       fetchSubmittedPicks();
       checkGameStatus();
-    }, 60000); // Refresh every 60 seconds
+    }, 60000); // Auto-refresh every 60s
 
     return () => clearInterval(interval);
   }, []);
@@ -35,6 +38,28 @@ export default function Home() {
       data?.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })) || []
     );
   };
+
+  const fetchTeamsForDay = async (day) => {
+    const { data: scheduleData } = await supabase
+      .from("team_schedule")
+      .select("team_id")
+      .eq("tournament_day", day);
+
+    if (scheduleData?.length) {
+      const teamIds = scheduleData.map((entry) => entry.team_id);
+      const { data: teamData } = await supabase
+        .from("teams")
+        .select("id, team_name")
+        .in("id", teamIds);
+      setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name)));
+    } else {
+      setTeams([]);
+    }
+  };
+
+  useEffect(() => {
+    if (tournamentDay) fetchTeamsForDay(tournamentDay);
+  }, [tournamentDay]);
 
   const fetchSubmittedPicks = async () => {
     const { data } = await supabase
@@ -52,6 +77,14 @@ export default function Home() {
     setPicksTable(Object.values(latestPicks));
   };
 
+  const fetchComments = async () => {
+    const { data } = await supabase
+      .from("comments")
+      .select("id, username, comment_text, created_at, parent_id")
+      .order("created_at", { ascending: true });
+    setComments(data || []);
+  };
+
   const checkGameStatus = () => {
     const firstGameTimes = {
       1: new Date("2025-03-20T12:00:00"),
@@ -64,55 +97,6 @@ export default function Home() {
       newGameStartedDays[day] = currentTime >= gameTime;
     });
     setGameStartedDays(newGameStartedDays);
-
-    Object.entries(newGameStartedDays).forEach(([day, started]) => {
-      if (started) {
-        setTournamentDay(day);
-        autoPickForUsers(day);
-      }
-    });
-  };
-
-  const autoPickForUsers = async (day) => {
-    const { data: users } = await supabase.from("users").select("id, username");
-    const { data: picksToday } = await supabase
-      .from("picks")
-      .select("username")
-      .eq("tournament_day", day);
-
-    const pickedUsernames = picksToday?.map((p) => p.username) || [];
-
-    for (const user of users) {
-      if (!pickedUsernames.includes(user.username)) {
-        const { data: userPicks } = await supabase
-          .from("picks")
-          .select("team_id")
-          .eq("username", user.username);
-        const pickedTeams = userPicks.map((p) => p.team_id);
-
-        const { data: scheduledTeams } = await supabase
-          .from("team_schedule")
-          .select("team_id")
-          .eq("tournament_day", day);
-
-        const teamToPick = scheduledTeams.find(
-          (team) => !pickedTeams.includes(team.team_id)
-        );
-
-        if (teamToPick) {
-          await supabase.from("picks").insert([
-            {
-              user_id: user.id,
-              username: user.username,
-              team_id: teamToPick.team_id,
-              tournament_day: parseInt(day, 10),
-              date: new Date().toISOString(),
-            },
-          ]);
-        }
-      }
-    }
-    fetchSubmittedPicks();
   };
 
   const handleLogin = async () => {
@@ -133,6 +117,7 @@ export default function Home() {
   };
 
   const submitPick = async () => {
+    setErrorMessage("");
     if (!pick || !tournamentDay) {
       setErrorMessage("Please select a team and day.");
       return;
@@ -153,9 +138,22 @@ export default function Home() {
     fetchSubmittedPicks();
   };
 
+  const renderComments = (parentId = null, level = 0) => {
+    return comments
+      .filter((c) => c.parent_id === parentId)
+      .map((c) => (
+        <div key={c.id} style={{ marginLeft: level * 20, padding: "8px", borderLeft: level ? "1px solid #ccc" : "none" }}>
+          <strong>{c.username}</strong>: {c.comment_text}
+          <div style={{ fontSize: "12px", color: "gray" }}>{new Date(c.created_at).toLocaleString()}</div>
+          {renderComments(c.id, level + 1)}
+        </div>
+      ));
+  };
+
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
+    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif", background: "transparent" }}>
       <h2>March Madness Pool</h2>
+
       {!isLoggedIn && (
         <div>
           <select onChange={(e) => setUsername(e.target.value)}>
@@ -170,16 +168,28 @@ export default function Home() {
         </div>
       )}
 
+      <h3>Comments</h3>
+      <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid #ccc", padding: "10px" }}>
+        {renderComments()}
+      </div>
+
       {isLoggedIn && (
         <div>
+          <h3>Make Your Pick</h3>
           <select onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
             <option value="">Select Day</option>
             {[...Array(10)].map((_, i) => (
               <option key={i + 1} value={i + 1}>Day {i + 1}</option>
             ))}
           </select>
-          <input placeholder="Team ID" value={pick} onChange={(e) => setPick(e.target.value)} />
+          <select onChange={(e) => setPick(e.target.value)} value={pick}>
+            <option value="">Select Team</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>{team.team_name}</option>
+            ))}
+          </select>
           <button onClick={submitPick}>Submit Pick</button>
+          {errorMessage && <div style={{ color: "red" }}>{errorMessage}</div>}
         </div>
       )}
 
