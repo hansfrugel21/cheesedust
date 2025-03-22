@@ -11,6 +11,7 @@ export default function Home() {
   const [teams, setTeams] = useState([]);
   const [picksTable, setPicksTable] = useState([]);
   const [gameStartedDays, setGameStartedDays] = useState({});
+  const [existingUsers, setExistingUsers] = useState([]); // Make sure this is initialized here
 
   // State for handling comments
   const [comments, setComments] = useState([]);
