@@ -1,5 +1,3 @@
-// ✅ Enhanced /pages/api/updateGames.js with debugging and detailed logs
-
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -34,20 +32,24 @@ export default async function handler(req, res) {
     let failCount = 0;
 
     for (const game of gameData) {
-      // Check for game completion and scores presence
-      if (!game.completed || !game.scores || !game.scores.home || !game.scores.away) {
-        console.log(`⏩ Skipping incomplete or invalid game: ${game.id}`, {
-          completed: game.completed,
-          scores: game.scores
-        });
+      if (!game.completed || !game.scores) {
+        console.log(`⏩ Skipping incomplete game: ${game.id}`);
         skippedCount++;
         continue;
       }
 
+      // Ensure both home and away scores exist before accessing
+      const homeScore = game.scores?.home?.score;
+      const awayScore = game.scores?.away?.score;
+
+      if (homeScore === undefined || awayScore === undefined) {
+        console.warn(`⚠️ Missing score data for game ${game.id}`);
+        failCount++;
+        continue;
+      }
+
       const winner =
-        game.scores.home.score > game.scores.away.score
-          ? game.home_team
-          : game.away_team;
+        homeScore > awayScore ? game.home_team : game.away_team;
 
       console.log(`🏀 Game complete. Winner determined: ${winner}`);
 
