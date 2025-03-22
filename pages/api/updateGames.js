@@ -34,6 +34,37 @@ export default async function handler(req, res) {
     let skippedCount = 0;
     let failCount = 0;
 
+    // Function to fetch team ID from alias or teams table
+    async function getTeamId(teamName) {
+      // Try to find the team alias
+      const { data: aliasData, error: aliasError } = await supabase
+        .from('team_aliases')
+        .select('team_id')
+        .eq('alias_name', teamName)
+        .single();
+
+      // If alias is not found, look up directly in the teams table
+      if (aliasError || !aliasData) {
+        console.log(`⚠️ Alias not found for team: ${teamName}. Searching in teams table...`);
+        const { data: teamData, error: teamError } = await supabase
+          .from('teams')
+          .select('id')
+          .eq('team_name', teamName)
+          .single();
+
+        if (teamError || !teamData) {
+          console.warn(`❌ Team not found in database: ${teamName}`);
+          return null;  // Return null if no team found in both tables
+        }
+
+        console.log(`✅ Team found in teams table: ${teamName}`);
+        return teamData.id;
+      }
+
+      // Return the team_id from the alias if found
+      return aliasData.team_id;
+    }
+
     // Process each game record
     for (const game of gameData) {
       if (!game.completed || !game.scores || game.scores.length !== 2) {
@@ -56,21 +87,12 @@ export default async function handler(req, res) {
       const winner = parseInt(homeScore) > parseInt(awayScore) ? game.home_team : game.away_team;
       console.log(`🏀 Game complete. Winner determined: ${winner}`);
 
-      // Fetch internal team_id using team alias
-      const { data: homeAlias, error: homeAliasError } = await supabase
-        .from("team_aliases")
-        .select("team_id")
-        .eq("alias_name", game.home_team)
-        .single();
+      // Fetch internal team_id using team alias or teams table
+      const homeTeamId = await getTeamId(game.home_team);
+      const awayTeamId = await getTeamId(game.away_team);
 
-      const { data: awayAlias, error: awayAliasError } = await supabase
-        .from("team_aliases")
-        .select("team_id")
-        .eq("alias_name", game.away_team)
-        .single();
-
-      if (homeAliasError || awayAliasError || !homeAlias || !awayAlias) {
-        console.warn(`⚠️ No alias mapping found for teams: ${game.home_team}, ${game.away_team}`);
+      if (!homeTeamId || !awayTeamId) {
+        console.warn(`❌ No team found for game ${game.id} between ${game.home_team} and ${game.away_team}`);
         failCount++;
         continue;
       }
@@ -87,7 +109,7 @@ export default async function handler(req, res) {
       console.log("📥 Upserting Game Record:", {
         tournament_day,
         winning_api_team: winner,
-        winning_team_id: winner === game.home_team ? homeAlias.team_id : awayAlias.team_id,
+        winning_team_id: winner === game.home_team ? homeTeamId : awayTeamId,
         updated_at: formattedUpdatedAt,
       });
 
@@ -99,7 +121,7 @@ export default async function handler(req, res) {
             {
               tournament_day,
               winning_api_team: winner,
-              winning_team_id: winner === game.home_team ? homeAlias.team_id : awayAlias.team_id,
+              winning_team_id: winner === game.home_team ? homeTeamId : awayTeamId,
               updated_at: formattedUpdatedAt,
             },
           ],
