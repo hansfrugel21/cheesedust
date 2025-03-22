@@ -1,4 +1,4 @@
-// ✅ Refactored /pages/api/updateGames.js with better error handling, alias mapping check, dynamic tournament day, and logging
+// ✅ Refactored /pages/api/updateGames.js with explicit updated_at formatting, error handling, alias mapping check, dynamic tournament day, and logging
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -55,7 +55,15 @@ export default async function handler(req, res) {
       if (gameDate >= new Date("2025-03-21T00:00:00Z")) tournament_day = 2;
       if (gameDate >= new Date("2025-03-22T00:00:00Z")) tournament_day = 3;
 
-      // Upsert the winning team into games table
+      const formattedUpdatedAt = new Date().toISOString().replace('T', ' ').split('.')[0];
+
+      console.log("Upserting Game Record:", {
+        tournament_day,
+        winning_api_team: winner,
+        winning_team_id: alias.team_id,
+        updated_at: formattedUpdatedAt,
+      });
+
       const { error: upsertError } = await supabase
         .from("games")
         .upsert(
@@ -64,11 +72,12 @@ export default async function handler(req, res) {
               tournament_day,
               winning_api_team: winner,
               winning_team_id: alias.team_id,
-              updated_at: new Date().toISOString(),
+              updated_at: formattedUpdatedAt,
             },
           ],
           { onConflict: "tournament_day,winning_api_team" }
-        );
+        )
+        .select("tournament_day, winning_api_team, winning_team_id, updated_at");
 
       if (upsertError) {
         console.error("Upsert failed for", winner, upsertError);
