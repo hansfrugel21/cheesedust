@@ -31,6 +31,9 @@ export default async function handler(req, res) {
     let skippedCount = 0;
     let failCount = 0;
 
+    // Table to log and show game data
+    let gameTable = [];
+
     for (const game of gameData) {
       if (!game.completed || !game.scores || game.scores.length !== 2) {
         console.log(`⏩ Skipping incomplete game: ${game.id}`, game);
@@ -50,8 +53,6 @@ export default async function handler(req, res) {
 
       const winner =
         parseInt(homeScore) > parseInt(awayScore) ? game.home_team : game.away_team;
-
-      console.log(`🏀 Game complete. Winner determined: ${winner}`);
 
       // Map API team name to internal team_id
       const { data: alias, error: aliasError } = await supabase
@@ -74,13 +75,18 @@ export default async function handler(req, res) {
 
       const formattedUpdatedAt = new Date().toISOString().replace('T', ' ').split('.')[0];
 
-      console.log("📥 Upserting Game Record:", {
+      // Log the game data for the table
+      gameTable.push({
+        game_id: game.id,
+        home_team: game.home_team,
+        away_team: game.away_team,
+        home_score: homeScore,
+        away_score: awayScore,
+        winner: winner,
         tournament_day,
-        winning_api_team: winner,
-        winning_team_id: alias.team_id,
-        updated_at: formattedUpdatedAt,
       });
 
+      // Upsert game result into Supabase
       const { error: upsertError } = await supabase
         .from("games")
         .upsert(
@@ -104,13 +110,18 @@ export default async function handler(req, res) {
       }
     }
 
+    // Log the table of game data
+    console.log("📊 Games Data:");
+    console.table(gameTable);  // This will print the data in a table format in the console
+
     console.log(`✅ Process complete - Success: ${successCount}, Skipped: ${skippedCount}, Failed: ${failCount}`);
 
     return res.status(200).json({ 
       message: "✅ Game results updated successfully", 
       successCount, 
       skippedCount, 
-      failCount
+      failCount,
+      gameTable  // Returning the game data table for reference
     });
   } catch (err) {
     console.error("❌ UpdateGames API failed:", err);
