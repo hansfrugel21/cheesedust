@@ -34,8 +34,39 @@ export default async function handler(req, res) {
     let skippedCount = 0;
     let failCount = 0;
 
-    // Function to fetch team ID from alias or teams table
+    // Hardcoded missing teams and their team_ids
+    const missingTeams = {
+      "American Eagles": "some-team-id-1",  // Replace with actual team ID
+      "Mt. St. Mary's Mountaineers": "some-team-id-2",  // Replace with actual team ID
+      "Saint Joseph's Hawks": "some-team-id-3",  // Replace with actual team ID
+      "UAB Blazers": "some-team-id-4",  // Replace with actual team ID
+      "George Mason Patriots": "some-team-id-5",  // Replace with actual team ID
+      "Samford Bulldogs": "some-team-id-6",  // Replace with actual team ID
+      "Dayton Flyers": "some-team-id-7",  // Replace with actual team ID
+      "Florida Atlantic Owls": "some-team-id-8",  // Replace with actual team ID
+      "North Texas Mean Green": "some-team-id-9",  // Replace with actual team ID
+      "Furman Paladins": "some-team-id-10",  // Replace with actual team ID
+      "Bradley Braves": "some-team-id-11",  // Replace with actual team ID
+      "North Alabama Lions": "some-team-id-12",  // Replace with actual team ID
+      "SMU Mustangs": "some-team-id-13",  // Replace with actual team ID
+      "Northern Iowa Panthers": "some-team-id-14",  // Replace with actual team ID
+      "Xavier Musketeers": "some-team-id-15",  // Replace with actual team ID
+      "UC Irvine Anteaters": "some-team-id-16",  // Replace with actual team ID
+      "N Colorado Bears": "some-team-id-17",  // Replace with actual team ID
+      "San José St Spartans": "some-team-id-18",  // Replace with actual team ID
+      "Loyola (Chi) Ramblers": "some-team-id-19",  // Replace with actual team ID
+      "San Francisco Dons": "some-team-id-20",  // Replace with actual team ID
+      "Utah Valley Wolverines": "some-team-id-21"  // Replace with actual team ID
+    };
+
+    // Function to fetch team ID from alias, teams table, or the hardcoded list
     async function getTeamId(teamName) {
+      // Check the missing teams list first
+      if (missingTeams[teamName]) {
+        console.log(`✅ Team found in hardcoded list: ${teamName}`);
+        return missingTeams[teamName];  // Return the hardcoded team_id
+      }
+
       // Try to find the team alias
       const { data: aliasData, error: aliasError } = await supabase
         .from('team_aliases')
@@ -87,7 +118,7 @@ export default async function handler(req, res) {
       const winner = parseInt(homeScore) > parseInt(awayScore) ? game.home_team : game.away_team;
       console.log(`🏀 Game complete. Winner determined: ${winner}`);
 
-      // Fetch internal team_id using team alias or teams table
+      // Fetch internal team_id using team alias or teams table or hardcoded list
       const homeTeamId = await getTeamId(game.home_team);
       const awayTeamId = await getTeamId(game.away_team);
 
