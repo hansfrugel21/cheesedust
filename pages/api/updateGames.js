@@ -38,7 +38,6 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // Ensure both home and away scores exist before accessing
       const homeScore = game.scores?.home?.score;
       const awayScore = game.scores?.away?.score;
 
