@@ -1,33 +1,40 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient";  // Ensure your supabaseClient is correctly configured
 
 export default function Home() {
+  // State variables for managing user login and picks
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [existingUsers, setExistingUsers] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [teams, setTeams] = useState([]);
-  const [tournamentDay, setTournamentDay] = useState("");
-  const [pick, setPick] = useState("");
   const [picksTable, setPicksTable] = useState([]);
   const [gameStartedDays, setGameStartedDays] = useState({});
-  const [teamResults, setTeamResults] = useState([]);
 
+  // State for handling comments
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+
+  // Fetch existing users on initial load
   useEffect(() => {
     fetchExistingUsers();
-    fetchSubmittedPicks();
     fetchComments();
     checkGameStatus();
   }, []);
 
+  // Fetch all users for the login dropdown
+  const fetchExistingUsers = async () => {
+    const { data } = await supabase.from("users").select("username, email");
+    setExistingUsers(data.sort((a, b) => a.username.localeCompare(b.username)));
+  };
+
+  // Check game start status and update accordingly
   const checkGameStatus = () => {
     const firstGameTimes = {
       1: new Date("2025-03-20T12:00:00"),
       2: new Date("2025-03-21T12:00:00"),
-      3: new Date("2025-03-22T12:10:00")
+      3: new Date("2025-03-22T12:10:00"),
     };
     const currentTime = new Date();
     const newGameStartedDays = {};
@@ -37,11 +44,26 @@ export default function Home() {
     setGameStartedDays(newGameStartedDays);
   };
 
-  const fetchExistingUsers = async () => {
-    const { data } = await supabase.from("users").select("username, email");
-    setExistingUsers(data.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })));
+  // Handle user login logic
+  const handleLogin = async () => {
+    setErrorMessage("");
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, username, email")
+      .eq("username", username)
+      .eq("email", email)
+      .single();
+
+    if (error || !user) {
+      setErrorMessage("User not found or email mismatch");
+      return;
+    }
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+    fetchSubmittedPicks();
   };
 
+  // Fetch comments from the database
   const fetchComments = async () => {
     const { data } = await supabase
       .from("comments")
@@ -50,27 +72,22 @@ export default function Home() {
     setComments(data || []);
   };
 
+  // Submit a new comment to the database
   const handleAddComment = async (parentId = null) => {
     if (!newComment.trim() || !currentUser) return;
     await supabase.from("comments").insert([
-      { user_id: currentUser.id, username: currentUser.username, comment_text: newComment, parent_id: parentId }
+      { user_id: currentUser.id, username: currentUser.username, comment_text: newComment, parent_id: parentId },
     ]);
     setNewComment("");
     fetchComments();
   };
 
+  // Render threaded comments
   const renderComments = (parentId = null, level = 0) => {
     return comments
       .filter(comment => comment.parent_id === parentId)
       .map(comment => (
-        <div key={comment.id} style={{
-          marginLeft: level * 20,
-          padding: "10px",
-          background: "#fff",
-          borderRadius: "8px",
-          marginBottom: "10px",
-          border: "1px solid #ddd"
-        }}>
+        <div key={comment.id} style={{ marginLeft: level * 20, padding: "10px", background: "#fff", borderRadius: "8px", marginBottom: "10px", border: "1px solid #ddd" }}>
           <b>{comment.username}</b>: {comment.comment_text}
           <div style={{ fontSize: "12px", color: "gray" }}>{new Date(comment.created_at).toLocaleString()}</div>
           {isLoggedIn && (
@@ -81,6 +98,7 @@ export default function Home() {
       ));
   };
 
+  // Fetch teams for the selected day
   const fetchTeamsForDay = async () => {
     if (!tournamentDay) {
       setTeams([]);
@@ -103,6 +121,7 @@ export default function Home() {
     }
   };
 
+  // Fetch the submitted picks from users
   const fetchSubmittedPicks = async () => {
     const { data } = await supabase
       .from("picks")
@@ -119,9 +138,17 @@ export default function Home() {
     setPicksTable(Object.values(latestPicks));
   };
 
+  // Submit the user pick for a specific day
   const submitPick = async () => {
-    if (!pick || !tournamentDay) return;
-
+    setErrorMessage("");
+    if (!pick || !tournamentDay) {
+      setErrorMessage("Please select a team and day.");
+      return;
+    }
+    if (gameStartedDays[tournamentDay]) {
+      setErrorMessage("Pick submission closed for this day.");
+      return;
+    }
     await supabase.from("picks").insert([
       {
         user_id: currentUser.id,
@@ -134,35 +161,16 @@ export default function Home() {
     fetchSubmittedPicks();
   };
 
+  // Define unique users based on submitted picks
   const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))]
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
+  // Get the days for which picks are submitted
   const days = [...new Set(picksTable.map((entry) => entry.tournament_day))]
     .sort((a, b) => a - b);
 
-  // Fetch results for all teams
-  const fetchTeamResults = async () => {
-    const { data: gameResults } = await supabase
-      .from("games")
-      .select("winning_api_team, tournament_day")
-      .order("tournament_day", { ascending: true });
-
-    const results = [];
-    for (const result of gameResults) {
-      const { winning_api_team, tournament_day } = result;
-      results.push({ team: winning_api_team, day: tournament_day, result: "Won" });
-    }
-    setTeamResults(results);
-  };
-
-  useEffect(() => {
-    fetchTeamsForDay();
-    fetchTeamResults();
-  }, [tournamentDay]);
-
   return (
     <div style={{ background: "transparent", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
-      {/* Login form */}
       {!isLoggedIn && (
         <div style={{ marginBottom: "30px" }}>
           <h3 style={{ color: "#444" }}>Login to Submit Picks and Comment</h3>
@@ -174,16 +182,22 @@ export default function Home() {
           </select><br />
           <input style={{ padding: "10px", width: "250px", borderRadius: "5px", marginBottom: "10px" }} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /><br />
           <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={handleLogin}>Login</button>
+          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
         </div>
       )}
 
-      {/* Comments section */}
       <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Comments</h2>
       <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "10px" }}>
         {renderComments()}
       </div>
 
-      {/* Make a pick */}
+      {isLoggedIn && (
+        <div style={{ marginBottom: "30px" }}>
+          <textarea rows="3" style={{ width: "100%", padding: "10px", borderRadius: "8px" }} placeholder="Write a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} />
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none", marginTop: "10px" }} onClick={() => handleAddComment(null)}>Post Comment</button>
+        </div>
+      )}
+
       {isLoggedIn && (
         <div style={{ marginBottom: "30px" }}>
           <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Make Your Pick</h2>
@@ -196,10 +210,10 @@ export default function Home() {
             {teams.map((team) => (<option key={team.id} value={team.id}>{team.team_name}</option>))}
           </select>
           <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={submitPick}>Submit Pick</button>
+          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
         </div>
       )}
 
-      {/* Picks Table */}
       <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Submitted Picks</h2>
       <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff", border: "1px solid #ddd" }}>
         <thead>
@@ -209,46 +223,4 @@ export default function Home() {
           </tr>
         </thead>
         <tbody>
-          {uniqueUsers.map((user, idx) => (
-            <tr key={user} style={{ backgroundColor: idx % 2 === 0 ? "#fdf5e6" : "#fff" }}>
-              <td style={{ padding: "10px", border: "1px solid #ddd" }}>{user}</td>
-              {days.map((day) => {
-                const pickEntry = picksTable.find(
-                  (entry) => entry.username === user && entry.tournament_day === day
-                );
-                return (
-                  <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
-                    {pickEntry ? (
-                      (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
-                        ? pickEntry.teams.team_name
-                        : "Submitted"
-                    ) : ""}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Teams Results Table */}
-      <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Teams Results</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff", border: "1px solid #ddd" }}>
-        <thead>
-          <tr style={{ backgroundColor: "#f4b942", color: "#fff" }}>
-            <th style={{ padding: "10px", border: "1px solid #ddd" }}>Team</th>
-            <th style={{ padding: "10px", border: "1px solid #ddd" }}>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          {teamResults.sort((a, b) => a.team.localeCompare(b.team)).map((team, idx) => (
-            <tr key={team.team} style={{ backgroundColor: idx % 2 === 0 ? "#fdf5e6" : "#fff" }}>
-              <td style={{ padding: "10px", border: "1px solid #ddd" }}>{team.team}</td>
-              <td style={{ padding: "10px", border: "1px solid #ddd" }}>{team.result}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+         
