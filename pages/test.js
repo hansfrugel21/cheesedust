@@ -116,7 +116,7 @@ export default function Home() {
       const teamIds = scheduleData.map((entry) => entry.team_id);
       const { data: teamData } = await supabase
         .from("teams")
-        .select("id, team_name, eliminated")  // Make sure to fetch the 'eliminated' flag
+        .select("id, team_name")
         .in("id", teamIds);
       setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
     } else {
@@ -172,22 +172,6 @@ export default function Home() {
   const days = [...new Set(picksTable.map((entry) => entry.tournament_day))]
     .sort((a, b) => a - b);
 
-const style = {
-  textDecoration: "line-through",
-  color: "gray",
-};
-
-// Inside your JSX
-<option
-  key={team.id}
-  value={team.id}
-  className={team.eliminated ? 'eliminated' : ''} 
-  style={team.eliminated ? style : {}}
->
-  {team.team_name}
-</option>
-
-
   return (
     <div style={{ background: "transparent", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
       {!isLoggedIn && (
@@ -227,7 +211,11 @@ const style = {
           <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setPick(e.target.value)} value={pick}>
             <option value="">Select Team</option>
             {teams.map((team) => (
-              <option key={team.id} value={team.id} className={team.eliminated ? 'eliminated' : ''}>
+              <option
+                key={team.id}
+                value={team.id}
+                style={team.eliminated ? { textDecoration: 'line-through', color: 'gray' } : {}}
+              >
                 {team.team_name}
               </option>
             ))}
