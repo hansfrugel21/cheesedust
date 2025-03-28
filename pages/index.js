@@ -33,7 +33,7 @@ export default function Home() {
       2: new Date("2025-03-21T12:00:00"),
       3: new Date("2025-03-22T12:10:00"),
       4: new Date("2025-03-23T12:10:00"),
- 4: new Date("2025-03-27T12:10:00")
+ 5: new Date("2025-03-27T12:10:00")
     };
     const currentTime = new Date();
     const newGameStartedDays = {};
