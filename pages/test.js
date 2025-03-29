@@ -103,7 +103,7 @@ export default function Home() {
       .select("username, tournament_day, team_id, date, teams(team_name)")
       .order("date", { ascending: false });
 
-    console.log("Picks fetched:", data);  // Debugging line
+    console.log("Picks fetched:", data);
 
     const latestPicks = {};
     data?.forEach((entry) => {
@@ -113,6 +113,7 @@ export default function Home() {
       }
     });
 
+    // Set the state for picksTable
     setPicksTable(Object.values(latestPicks));
   };
 
@@ -139,6 +140,7 @@ export default function Home() {
   };
 
   const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))]
+    .filter((username) => username !== null)  // Filtering out null usernames
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
   const days = [...new Set(picksTable.map((entry) => entry.tournament_day))]
