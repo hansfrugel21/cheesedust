@@ -29,7 +29,12 @@ export default function Home() {
     const firstGameTimes = {
       1: new Date("2025-03-20T12:00:00"),
       2: new Date("2025-03-21T12:00:00"),
-      3: new Date("2025-03-22T12:10:00")
+      3: new Date("2025-03-22T12:10:00"),
+      4: new Date("2025-03-23T12:10:00"),
+      5: new Date("2025-03-27T12:10:00"),
+      6: new Date("2025-03-28T12:00:00"),
+      7: new Date("2025-03-29T18:10:00"),
+      8: new Date("2025-03-30T14:20:00"),
     };
     const currentTime = new Date();
     const newGameStartedDays = {};
@@ -131,7 +136,7 @@ export default function Home() {
   const fetchSubmittedPicks = async () => {
     const { data } = await supabase
       .from("picks")
-      .select("username, tournament_day, team_id, date, teams(team_name), eliminated")
+      .select("username, tournament_day, team_id, date, teams(team_name)")
       .order("date", { ascending: false });
 
     const latestPicks = {};
@@ -141,6 +146,7 @@ export default function Home() {
         latestPicks[key] = entry;
       }
     });
+    console.log(latestPicks);  // Log to see the fetched data
     setPicksTable(Object.values(latestPicks));
   };
 
@@ -210,15 +216,7 @@ export default function Home() {
           </select>
           <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setPick(e.target.value)} value={pick}>
             <option value="">Select Team</option>
-            {teams.map((team) => (
-              <option
-                key={team.id}
-                value={team.id}
-                style={team.eliminated ? { textDecoration: 'line-through', color: 'gray' } : {}}
-              >
-                {team.team_name}
-              </option>
-            ))}
+            {teams.map((team) => (<option key={team.id} value={team.id}>{team.team_name}</option>))}
           </select>
           <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={submitPick}>Submit Pick</button>
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
