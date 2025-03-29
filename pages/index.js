@@ -1,5 +1,3 @@
-// ✅ Updated with threaded comments, scrollable comment section, and subtle table borders
-
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
@@ -33,8 +31,8 @@ export default function Home() {
       2: new Date("2025-03-21T12:00:00"),
       3: new Date("2025-03-22T12:10:00"),
       4: new Date("2025-03-23T12:10:00"),
- 5: new Date("2025-03-27T12:10:00"),
-       6: new Date("2025-03-28T12:00:00"),
+      5: new Date("2025-03-27T12:10:00"),
+      6: new Date("2025-03-28T12:00:00"),
       7: new Date("2025-03-29T18:10:00"),
       8: new Date("2025-03-30T14:20:00"),
     };
@@ -148,6 +146,7 @@ export default function Home() {
         latestPicks[key] = entry;
       }
     });
+    console.log(latestPicks);  // Log to see the fetched data
     setPicksTable(Object.values(latestPicks));
   };
 
