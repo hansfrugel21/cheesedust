@@ -75,37 +75,6 @@ export default function Home() {
     setComments(data || []);
   };
 
-  const handleAddComment = async (parentId = null) => {
-    if (!newComment.trim() || !currentUser) return;
-    await supabase.from("comments").insert([
-      { user_id: currentUser.id, username: currentUser.username, comment_text: newComment, parent_id: parentId }
-    ]);
-    setNewComment("");
-    fetchComments();
-  };
-
-  const renderComments = (parentId = null, level = 0) => {
-    return comments
-      .filter(comment => comment.parent_id === parentId)
-      .map(comment => (
-        <div key={comment.id} style={{
-          marginLeft: level * 20,
-          padding: "10px",
-          background: "#fff",
-          borderRadius: "8px",
-          marginBottom: "10px",
-          border: "1px solid #ddd"
-        }}>
-          <b>{comment.username}</b>: {comment.comment_text}
-          <div style={{ fontSize: "12px", color: "gray" }}>{new Date(comment.created_at).toLocaleString()}</div>
-          {isLoggedIn && (
-            <button style={{ marginTop: "5px", fontSize: "12px" }} onClick={() => handleAddComment(comment.id)}>Reply</button>
-          )}
-          {renderComments(comment.id, level + 1)}
-        </div>
-      ));
-  };
-
   const fetchTeamsForDay = async () => {
     if (!tournamentDay) {
       setTeams([]);
@@ -122,16 +91,11 @@ export default function Home() {
         .from("teams")
         .select("id, team_name")
         .in("id", teamIds);
-      console.log("Teams fetched:", teamData);  // Debugging line
       setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
     } else {
       setTeams([]);
     }
   };
-
-  useEffect(() => {
-    fetchTeamsForDay();
-  }, [tournamentDay]);
 
   const fetchSubmittedPicks = async () => {
     const { data } = await supabase
@@ -148,6 +112,7 @@ export default function Home() {
         latestPicks[key] = entry;
       }
     });
+
     setPicksTable(Object.values(latestPicks));
   };
 
