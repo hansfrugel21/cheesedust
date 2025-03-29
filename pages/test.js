@@ -3,7 +3,6 @@ import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
   const [username, setUsername] = useState("");
-  const [venmo, setVenmo] = useState("");
   const [email, setEmail] = useState("");
   const [existingUsers, setExistingUsers] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -146,7 +145,6 @@ export default function Home() {
         latestPicks[key] = entry;
       }
     });
-    console.log(latestPicks);  // Log to see the fetched data
     setPicksTable(Object.values(latestPicks));
   };
 
@@ -241,11 +239,7 @@ export default function Home() {
                 );
                 return (
                   <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
-                    {pickEntry ? (
-                      (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
-                        ? pickEntry.teams.team_name
-                        : "Submitted"
-                    ) : ""}
+                    {pickEntry ? pickEntry.teams.team_name : ""}
                   </td>
                 );
               })}
