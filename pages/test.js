@@ -25,6 +25,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchTeamsForDay();
+    fetchSubmittedPicks();
   }, [tournamentDay]);
 
   const checkGameStatus = () => {
