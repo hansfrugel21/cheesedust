@@ -143,7 +143,6 @@ export default function Home() {
     // Store only the most recent pick for each user and day
     data?.forEach((entry) => {
       const key = `${entry.username}-${entry.tournament_day}`;  // Unique key for user and day
-      // Store the pick if we don't have one for this user and day yet
       if (!latestPicks[key]) {
         latestPicks[key] = entry;
       }
