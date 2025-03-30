@@ -18,11 +18,16 @@ export default function Home() {
 
   // Fetch initial data on page load
   useEffect(() => {
-    fetchExistingUsers();
-    fetchComments();
-    fetchSubmittedPicks();
-    checkGameStatus();
-  }, []);
+    // A wrapper function to ensure async behavior inside useEffect
+    const fetchData = async () => {
+      await fetchExistingUsers();
+      await fetchComments();
+      await fetchSubmittedPicks();
+      checkGameStatus();
+    };
+
+    fetchData();
+  }, []); // The empty dependency array ensures this runs once when the component mounts
 
   const checkGameStatus = () => {
     const firstGameTimes = {
@@ -93,28 +98,6 @@ export default function Home() {
     } catch (error) {
       console.error("Error adding comment:", error);
     }
-  };
-
-  const renderComments = (parentId = null, level = 0) => {
-    return comments
-      .filter(comment => comment.parent_id === parentId)
-      .map(comment => (
-        <div key={comment.id} style={{
-          marginLeft: level * 20,
-          padding: "10px",
-          background: "#fff",
-          borderRadius: "8px",
-          marginBottom: "10px",
-          border: "1px solid #ddd"
-        }}>
-          <b>{comment.username}</b>: {comment.comment_text}
-          <div style={{ fontSize: "12px", color: "gray" }}>{new Date(comment.created_at).toLocaleString()}</div>
-          {isLoggedIn && (
-            <button style={{ marginTop: "5px", fontSize: "12px" }} onClick={() => handleAddComment(comment.id)}>Reply</button>
-          )}
-          {renderComments(comment.id, level + 1)}
-        </div>
-      ));
   };
 
   const fetchTeamsForDay = async () => {
