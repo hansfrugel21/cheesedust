@@ -135,14 +135,20 @@ export default function Home() {
         .select("username, tournament_day, team_id, created_at, teams(team_name)")
         .order("created_at", { ascending: false });
 
+      // Log fetched picks for debugging
+      console.log("Fetched Picks:", data);
+
       const latestPicks = {};
 
+      // Store only the most recent pick for each user and day
       data?.forEach((entry) => {
         const key = `${entry.username}-${entry.tournament_day}`; 
         if (!latestPicks[key] || new Date(entry.created_at) > new Date(latestPicks[key].created_at)) {
           latestPicks[key] = entry;
         }
       });
+
+      console.log("Latest Picks (after filtering):", latestPicks);
 
       setPicksTable(Object.values(latestPicks));  
     } catch (error) {
