@@ -16,7 +16,6 @@ export default function Home() {
   const [gameStartedDays, setGameStartedDays] = useState({});
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Fetch initial data on page load
   useEffect(() => {
     const fetchData = async () => {
       await fetchExistingUsers();
@@ -50,7 +49,6 @@ export default function Home() {
   const fetchExistingUsers = async () => {
     try {
       const { data } = await supabase.from("users").select("username, email");
-      console.log("Fetched Users:", data); // Debugging log to check the users fetched
       setExistingUsers(data || []);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -81,7 +79,6 @@ export default function Home() {
         .from("comments")
         .select("id, username, comment_text, created_at, parent_id")
         .order("created_at", { ascending: true });
-      console.log("Fetched Comments:", data); // Debugging log to check comments fetched
       setComments(data || []);
     } catch (error) {
       console.error("Error fetching comments:", error);
@@ -118,7 +115,6 @@ export default function Home() {
           .from("teams")
           .select("id, team_name")
           .in("id", teamIds);
-        console.log("Fetched Teams:", teamData); // Debugging log to check teams fetched
         setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
       } else {
         setTeams([]);
@@ -137,20 +133,18 @@ export default function Home() {
       const { data } = await supabase
         .from("picks")
         .select("username, tournament_day, team_id, created_at, teams(team_name)")
-        .order("created_at", { ascending: false }); // Order by creation time, descending
-      console.log("Fetched Picks:", data); // Debugging log to check the picks fetched
+        .order("created_at", { ascending: false });
 
       const latestPicks = {};
 
-      // Store only the most recent pick for each user and tournament day
       data?.forEach((entry) => {
-        const key = `${entry.username}-${entry.tournament_day}`;  // Unique key for user and tournament day
+        const key = `${entry.username}-${entry.tournament_day}`; 
         if (!latestPicks[key] || new Date(entry.created_at) > new Date(latestPicks[key].created_at)) {
           latestPicks[key] = entry;
         }
       });
 
-      setPicksTable(Object.values(latestPicks));  // Convert map to array and store it
+      setPicksTable(Object.values(latestPicks));  
     } catch (error) {
       console.error("Error fetching submitted picks:", error);
     }
@@ -190,7 +184,71 @@ export default function Home() {
 
   return (
     <div style={{ background: "transparent", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
-      {/* Add your remaining JSX, such as login form, comment form, and picks table */}
+      {!isLoggedIn && (
+        <div style={{ marginBottom: "30px" }}>
+          <h3 style={{ color: "#444" }}>Login to Submit Picks and Comment</h3>
+          <select style={{ padding: "10px", borderRadius: "5px", marginBottom: "10px" }} onChange={(e) => setUsername(e.target.value)}>
+            <option value="">Select user</option>
+            {existingUsers.map((user) => (
+              <option key={user.username} value={user.username}>{user.username}</option>
+            ))}
+          </select><br />
+          <input style={{ padding: "10px", width: "250px", borderRadius: "5px", marginBottom: "10px" }} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /><br />
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={handleLogin}>Login</button>
+          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+        </div>
+      )}
+
+      <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Comments</h2>
+      <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "10px" }}>
+        {comments.map((comment) => (
+          <div key={comment.id}>
+            <b>{comment.username}</b>: {comment.comment_text}
+            <div>{new Date(comment.created_at).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+
+      {isLoggedIn && (
+        <div style={{ marginBottom: "30px" }}>
+          <h2>Make Your Pick</h2>
+          <select onChange={(e) => setTournamentDay(e.target.value)}>
+            <option value="">Select Day</option>
+            {[...Array(10)].map((_, i) => (<option key={i + 1} value={i + 1}>Day {i + 1}</option>))}
+          </select>
+          <select onChange={(e) => setPick(e.target.value)}>
+            <option value="">Select Team</option>
+            {teams.map((team) => (<option key={team.id} value={team.id}>{team.team_name}</option>))}
+          </select>
+          <button onClick={submitPick}>Submit Pick</button>
+          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+        </div>
+      )}
+
+      <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Submitted Picks</h2>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr style={{ backgroundColor: "#f4b942", color: "#fff" }}>
+            <th>Username</th>
+            {days.map((day) => (<th key={day}>Day {day}</th>))}
+          </tr>
+        </thead>
+        <tbody>
+          {uniqueUsers.map((user) => (
+            <tr key={user}>
+              <td>{user}</td>
+              {days.map((day) => {
+                const pickEntry = picksTable.find(entry => entry.username === user && entry.tournament_day === day);
+                return (
+                  <td key={day}>
+                    {pickEntry ? pickEntry.teams.team_name : ""}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
