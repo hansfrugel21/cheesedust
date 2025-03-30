@@ -136,21 +136,21 @@ export default function Home() {
     const { data } = await supabase
       .from("picks")
       .select("username, tournament_day, team_id, date, teams(team_name)")
-      .order("date", { ascending: false });
+      .order("date", { ascending: false });  // Order by date DESC, so most recent picks come first
 
     const latestPicks = {};
 
-    // Store only the most recent pick per user and day
+    // Store only the most recent pick for each user and day
     data?.forEach((entry) => {
-      const key = `${entry.username}-${entry.tournament_day}`;
-      // Only store the most recent pick for each day
+      const key = `${entry.username}-${entry.tournament_day}`;  // Unique key for user and day
+      // Store the pick if we don't have one for this user and day yet
       if (!latestPicks[key]) {
         latestPicks[key] = entry;
       }
     });
 
-    console.log("Fetched Picks (Most Recent Per Day):", latestPicks); // Log for debugging
-    setPicksTable(Object.values(latestPicks));  // Flatten to get an array of latest picks
+    console.log("Fetched Picks (Most Recent Per Day):", latestPicks);  // Log for debugging
+    setPicksTable(Object.values(latestPicks));  // Convert map to array and store it
   };
 
   const submitPick = async () => {
