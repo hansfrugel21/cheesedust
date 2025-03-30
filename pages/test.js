@@ -3,27 +3,28 @@ import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
   const [username, setUsername] = useState("");
+  const [venmo, setVenmo] = useState("");
   const [email, setEmail] = useState("");
+  const [existingUsers, setExistingUsers] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
   const [teams, setTeams] = useState([]);
   const [tournamentDay, setTournamentDay] = useState("");
   const [pick, setPick] = useState("");
   const [picksTable, setPicksTable] = useState([]);
   const [gameStartedDays, setGameStartedDays] = useState({});
-  const [existingUsers, setExistingUsers] = useState([]);
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     fetchExistingUsers();
+    fetchSubmittedPicks();
     fetchComments();
     checkGameStatus();
-    fetchSubmittedPicks();
   }, []);
 
-  // This function checks if the games for each day have started
   const checkGameStatus = () => {
     const firstGameTimes = {
       1: new Date("2025-03-20T12:00:00"),
@@ -35,7 +36,6 @@ export default function Home() {
       7: new Date("2025-03-29T18:10:00"),
       8: new Date("2025-03-30T14:20:00"),
     };
-
     const currentTime = new Date();
     const newGameStartedDays = {};
     Object.entries(firstGameTimes).forEach(([day, gameTime]) => {
@@ -44,15 +44,14 @@ export default function Home() {
     setGameStartedDays(newGameStartedDays);
   };
 
-  // Fetch the existing users for the login dropdown
   const fetchExistingUsers = async () => {
     const { data } = await supabase.from("users").select("username, email");
     setExistingUsers(data.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })));
   };
 
-  // Handle user login
   const handleLogin = async () => {
     setErrorMessage("");
+    setSuccessMessage("");
     const { data: user } = await supabase
       .from("users")
       .select("id, username, email")
@@ -69,7 +68,6 @@ export default function Home() {
     fetchSubmittedPicks();
   };
 
-  // Fetch comments from the database
   const fetchComments = async () => {
     const { data } = await supabase
       .from("comments")
@@ -78,7 +76,6 @@ export default function Home() {
     setComments(data || []);
   };
 
-  // Add a new comment to the database
   const handleAddComment = async (parentId = null) => {
     if (!newComment.trim() || !currentUser) return;
     await supabase.from("comments").insert([
@@ -88,7 +85,28 @@ export default function Home() {
     fetchComments();
   };
 
-  // Fetch teams for the selected tournament day
+  const renderComments = (parentId = null, level = 0) => {
+    return comments
+      .filter(comment => comment.parent_id === parentId)
+      .map(comment => (
+        <div key={comment.id} style={{
+          marginLeft: level * 20,
+          padding: "10px",
+          background: "#fff",
+          borderRadius: "8px",
+          marginBottom: "10px",
+          border: "1px solid #ddd"
+        }}>
+          <b>{comment.username}</b>: {comment.comment_text}
+          <div style={{ fontSize: "12px", color: "gray" }}>{new Date(comment.created_at).toLocaleString()}</div>
+          {isLoggedIn && (
+            <button style={{ marginTop: "5px", fontSize: "12px" }} onClick={() => handleAddComment(comment.id)}>Reply</button>
+          )}
+          {renderComments(comment.id, level + 1)}
+        </div>
+      ));
+  };
+
   const fetchTeamsForDay = async () => {
     if (!tournamentDay) {
       setTeams([]);
@@ -111,7 +129,10 @@ export default function Home() {
     }
   };
 
-  // Fetch the most recent picks for each user and day
+  useEffect(() => {
+    fetchTeamsForDay();
+  }, [tournamentDay]);
+
   const fetchSubmittedPicks = async () => {
     const { data } = await supabase
       .from("picks")
@@ -119,16 +140,18 @@ export default function Home() {
       .order("date", { ascending: false });
 
     const latestPicks = {};
+
     data?.forEach((entry) => {
       const key = `${entry.username}-${entry.tournament_day}`;
       if (!latestPicks[key]) {
         latestPicks[key] = entry;
       }
     });
-    setPicksTable(Object.values(latestPicks));
+
+    console.log(latestPicks);  // Log to see the fetched data
+    setPicksTable(Object.values(latestPicks));  // Store the most recent pick per user and day
   };
 
-  // Submit a pick to the database
   const submitPick = async () => {
     setErrorMessage("");
     if (!pick || !tournamentDay) {
@@ -171,41 +194,36 @@ export default function Home() {
           <input style={{ padding: "10px", width: "250px", borderRadius: "5px", marginBottom: "10px" }} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /><br />
           <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={handleLogin}>Login</button>
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+          {successMessage && <div style={{ color: "green", marginTop: "10px" }}>{successMessage}</div>}
         </div>
       )}
 
       <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Comments</h2>
       <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "10px" }}>
-        {comments.map((comment) => (
-          <div key={comment.id} style={{ padding: "10px", margin: "10px 0", border: "1px solid #ddd", borderRadius: "5px", backgroundColor: "#f9f9f9" }}>
-            <strong>{comment.username}</strong>: {comment.comment_text}
-            <div style={{ fontSize: "12px", color: "gray" }}>{new Date(comment.created_at).toLocaleString()}</div>
-            {isLoggedIn && (
-              <button style={{ marginTop: "5px", fontSize: "12px" }} onClick={() => handleAddComment(comment.id)}>Reply</button>
-            )}
-          </div>
-        ))}
+        {renderComments()}
       </div>
-
       {isLoggedIn && (
         <div style={{ marginBottom: "30px" }}>
           <textarea rows="3" style={{ width: "100%", padding: "10px", borderRadius: "8px" }} placeholder="Write a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} />
-          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none", marginTop: "10px" }} onClick={() => handleAddComment()}>Post Comment</button>
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none", marginTop: "10px" }} onClick={() => handleAddComment(null)}>Post Comment</button>
         </div>
       )}
 
-      <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Make Your Pick</h2>
-      <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
-        <option value="">Select Day</option>
-        {[...Array(8)].map((_, i) => (<option key={i + 1} value={i + 1}>Day {i + 1}</option>))}
-      </select>
-      <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setPick(e.target.value)} value={pick}>
-        <option value="">Select Team</option>
-        {teams.map((team) => (<option key={team.id} value={team.id}>{team.team_name}</option>))}
-      </select>
-      <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={submitPick}>Submit Pick</button>
-
-      {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+      {isLoggedIn && (
+        <div style={{ marginBottom: "30px" }}>
+          <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Make Your Pick</h2>
+          <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
+            <option value="">Select Day</option>
+            {[...Array(10)].map((_, i) => (<option key={i + 1} value={i + 1}>Day {i + 1}</option>))}
+          </select>
+          <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setPick(e.target.value)} value={pick}>
+            <option value="">Select Team</option>
+            {teams.map((team) => (<option key={team.id} value={team.id}>{team.team_name}</option>))}
+          </select>
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={submitPick}>Submit Pick</button>
+          {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+        </div>
+      )}
 
       <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Submitted Picks</h2>
       <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff", border: "1px solid #ddd" }}>
@@ -225,7 +243,11 @@ export default function Home() {
                 );
                 return (
                   <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
-                    {pickEntry ? pickEntry.teams.team_name : "No pick"}
+                    {pickEntry ? (
+                      (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
+                        ? pickEntry.teams.team_name
+                        : "Submitted"
+                    ) : ""}
                   </td>
                 );
               })}
