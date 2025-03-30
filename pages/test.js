@@ -15,16 +15,13 @@ export default function Home() {
   const [picksTable, setPicksTable] = useState([]);
   const [gameStartedDays, setGameStartedDays] = useState({});
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
-    const fetchData = async () => {
-      await fetchExistingUsers();
-      await fetchComments();
-      await fetchSubmittedPicks();
-      checkGameStatus();
-    };
-
-    fetchData();
+    fetchExistingUsers();
+    fetchSubmittedPicks();
+    fetchComments();
+    checkGameStatus();
   }, []);
 
   const checkGameStatus = () => {
@@ -47,16 +44,13 @@ export default function Home() {
   };
 
   const fetchExistingUsers = async () => {
-    try {
-      const { data } = await supabase.from("users").select("username, email");
-      setExistingUsers(data || []);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-    }
+    const { data } = await supabase.from("users").select("username, email");
+    setExistingUsers(data.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })));
   };
 
   const handleLogin = async () => {
     setErrorMessage("");
+    setSuccessMessage("");
     const { data: user } = await supabase
       .from("users")
       .select("id, username, email")
@@ -74,28 +68,42 @@ export default function Home() {
   };
 
   const fetchComments = async () => {
-    try {
-      const { data } = await supabase
-        .from("comments")
-        .select("id, username, comment_text, created_at, parent_id")
-        .order("created_at", { ascending: true });
-      setComments(data || []);
-    } catch (error) {
-      console.error("Error fetching comments:", error);
-    }
+    const { data } = await supabase
+      .from("comments")
+      .select("id, username, comment_text, created_at, parent_id")
+      .order("created_at", { ascending: true });
+    setComments(data || []);
   };
 
   const handleAddComment = async (parentId = null) => {
     if (!newComment.trim() || !currentUser) return;
-    try {
-      await supabase.from("comments").insert([
-        { user_id: currentUser.id, username: currentUser.username, comment_text: newComment, parent_id: parentId }
-      ]);
-      setNewComment("");
-      fetchComments();
-    } catch (error) {
-      console.error("Error adding comment:", error);
-    }
+    await supabase.from("comments").insert([
+      { user_id: currentUser.id, username: currentUser.username, comment_text: newComment, parent_id: parentId }
+    ]);
+    setNewComment("");
+    fetchComments();
+  };
+
+  const renderComments = (parentId = null, level = 0) => {
+    return comments
+      .filter(comment => comment.parent_id === parentId)
+      .map(comment => (
+        <div key={comment.id} style={{
+          marginLeft: level * 20,
+          padding: "10px",
+          background: "#fff",
+          borderRadius: "8px",
+          marginBottom: "10px",
+          border: "1px solid #ddd"
+        }}>
+          <b>{comment.username}</b>: {comment.comment_text}
+          <div style={{ fontSize: "12px", color: "gray" }}>{new Date(comment.created_at).toLocaleString()}</div>
+          {isLoggedIn && (
+            <button style={{ marginTop: "5px", fontSize: "12px" }} onClick={() => handleAddComment(comment.id)}>Reply</button>
+          )}
+          {renderComments(comment.id, level + 1)}
+        </div>
+      ));
   };
 
   const fetchTeamsForDay = async () => {
@@ -103,24 +111,20 @@ export default function Home() {
       setTeams([]);
       return;
     }
-    try {
-      const { data: scheduleData } = await supabase
-        .from("team_schedule")
-        .select("team_id")
-        .eq("tournament_day", tournamentDay);
+    const { data: scheduleData } = await supabase
+      .from("team_schedule")
+      .select("team_id")
+      .eq("tournament_day", tournamentDay);
 
-      if (scheduleData?.length) {
-        const teamIds = scheduleData.map((entry) => entry.team_id);
-        const { data: teamData } = await supabase
-          .from("teams")
-          .select("id, team_name")
-          .in("id", teamIds);
-        setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
-      } else {
-        setTeams([]);
-      }
-    } catch (error) {
-      console.error("Error fetching teams:", error);
+    if (scheduleData?.length) {
+      const teamIds = scheduleData.map((entry) => entry.team_id);
+      const { data: teamData } = await supabase
+        .from("teams")
+        .select("id, team_name")
+        .in("id", teamIds);
+      setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
+    } else {
+      setTeams([]);
     }
   };
 
@@ -129,31 +133,24 @@ export default function Home() {
   }, [tournamentDay]);
 
   const fetchSubmittedPicks = async () => {
-    try {
-      const { data } = await supabase
-        .from("picks")
-        .select("username, tournament_day, team_id, created_at, teams(team_name)")
-        .order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("picks")
+      .select("username, tournament_day, team_id, created_at, teams(team_name)")
+      .order("created_at", { ascending: false })  // Order by created_at DESC, so most recent picks come first
+      .limit(2500);  // Adjust the limit to 2500
 
-      // Log fetched picks for debugging
-      console.log("Fetched Picks:", data);
+    const latestPicks = {};
 
-      const latestPicks = {};
+    // Store only the most recent pick for each user and day
+    data?.forEach((entry) => {
+      const key = `${entry.username}-${entry.tournament_day}`;  // Unique key for user and day
+      if (!latestPicks[key]) {
+        latestPicks[key] = entry;
+      }
+    });
 
-      // Store only the most recent pick for each user and day
-      data?.forEach((entry) => {
-        const key = `${entry.username}-${entry.tournament_day}`; 
-        if (!latestPicks[key] || new Date(entry.created_at) > new Date(latestPicks[key].created_at)) {
-          latestPicks[key] = entry;
-        }
-      });
-
-      console.log("Latest Picks (after filtering):", latestPicks);
-
-      setPicksTable(Object.values(latestPicks));  
-    } catch (error) {
-      console.error("Error fetching submitted picks:", error);
-    }
+    console.log("Fetched Picks (Most Recent Per Day):", latestPicks);  // Log for debugging
+    setPicksTable(Object.values(latestPicks));  // Convert map to array and store it
   };
 
   const submitPick = async () => {
@@ -166,20 +163,16 @@ export default function Home() {
       setErrorMessage("Pick submission closed for this day.");
       return;
     }
-    try {
-      await supabase.from("picks").insert([
-        {
-          user_id: currentUser.id,
-          username: currentUser.username,
-          team_id: pick,
-          tournament_day: parseInt(tournamentDay, 10),
-          created_at: new Date().toISOString(),
-        },
-      ]);
-      fetchSubmittedPicks();
-    } catch (error) {
-      console.error("Error submitting pick:", error);
-    }
+    await supabase.from("picks").insert([
+      {
+        user_id: currentUser.id,
+        username: currentUser.username,
+        team_id: pick,
+        tournament_day: parseInt(tournamentDay, 10),
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    fetchSubmittedPicks();
   };
 
   const uniqueUsers = [...new Set(picksTable.map((entry) => entry.username))]
@@ -202,52 +195,60 @@ export default function Home() {
           <input style={{ padding: "10px", width: "250px", borderRadius: "5px", marginBottom: "10px" }} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} /><br />
           <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={handleLogin}>Login</button>
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
+          {successMessage && <div style={{ color: "green", marginTop: "10px" }}>{successMessage}</div>}
         </div>
       )}
 
       <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Comments</h2>
       <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "10px" }}>
-        {comments.map((comment) => (
-          <div key={comment.id}>
-            <b>{comment.username}</b>: {comment.comment_text}
-            <div>{new Date(comment.created_at).toLocaleString()}</div>
-          </div>
-        ))}
+        {renderComments()}
       </div>
+      {isLoggedIn && (
+        <div style={{ marginBottom: "30px" }}>
+          <textarea rows="3" style={{ width: "100%", padding: "10px", borderRadius: "8px" }} placeholder="Write a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} />
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none", marginTop: "10px" }} onClick={() => handleAddComment(null)}>Post Comment</button>
+        </div>
+      )}
 
       {isLoggedIn && (
         <div style={{ marginBottom: "30px" }}>
-          <h2>Make Your Pick</h2>
-          <select onChange={(e) => setTournamentDay(e.target.value)}>
+          <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Make Your Pick</h2>
+          <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setTournamentDay(e.target.value)} value={tournamentDay}>
             <option value="">Select Day</option>
             {[...Array(10)].map((_, i) => (<option key={i + 1} value={i + 1}>Day {i + 1}</option>))}
           </select>
-          <select onChange={(e) => setPick(e.target.value)}>
+          <select style={{ padding: "10px", borderRadius: "5px", marginRight: "10px" }} onChange={(e) => setPick(e.target.value)} value={pick}>
             <option value="">Select Team</option>
             {teams.map((team) => (<option key={team.id} value={team.id}>{team.team_name}</option>))}
           </select>
-          <button onClick={submitPick}>Submit Pick</button>
+          <button style={{ backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={submitPick}>Submit Pick</button>
           {errorMessage && <div style={{ color: "red", marginTop: "10px" }}>{errorMessage}</div>}
         </div>
       )}
 
       <h2 style={{ borderBottom: "2px solid #f4b942", paddingBottom: "5px" }}>Submitted Picks</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff", border: "1px solid #ddd" }}>
         <thead>
           <tr style={{ backgroundColor: "#f4b942", color: "#fff" }}>
-            <th>Username</th>
-            {days.map((day) => (<th key={day}>Day {day}</th>))}
+            <th style={{ padding: "10px", border: "1px solid #ddd" }}>Username</th>
+            {days.map((day) => (<th key={day} style={{ padding: "10px", border: "1px solid #ddd" }}>Day {day}</th>))}
           </tr>
         </thead>
         <tbody>
-          {uniqueUsers.map((user) => (
-            <tr key={user}>
-              <td>{user}</td>
+          {uniqueUsers.map((user, idx) => (
+            <tr key={user} style={{ backgroundColor: idx % 2 === 0 ? "#fdf5e6" : "#fff" }}>
+              <td style={{ padding: "10px", border: "1px solid #ddd" }}>{user}</td>
               {days.map((day) => {
-                const pickEntry = picksTable.find(entry => entry.username === user && entry.tournament_day === day);
+                const pickEntry = picksTable.find(
+                  (entry) => entry.username === user && entry.tournament_day === day
+                );
                 return (
-                  <td key={day}>
-                    {pickEntry ? pickEntry.teams.team_name : ""}
+                  <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
+                    {pickEntry ? (
+                      (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
+                        ? pickEntry.teams.team_name
+                        : "Submitted"
+                    ) : ""}
                   </td>
                 );
               })}
@@ -255,6 +256,8 @@ export default function Home() {
           ))}
         </tbody>
       </table>
+
+      {isLoggedIn && <button style={{ marginTop: "20px", backgroundColor: "#f4b942", padding: "10px 20px", borderRadius: "5px", border: "none" }} onClick={() => setIsLoggedIn(false)}>Logout</button>}
     </div>
   );
 }
