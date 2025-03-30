@@ -3,7 +3,6 @@ import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
   const [username, setUsername] = useState("");
-  const [venmo, setVenmo] = useState("");
   const [email, setEmail] = useState("");
   const [existingUsers, setExistingUsers] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -141,15 +140,17 @@ export default function Home() {
 
     const latestPicks = {};
 
+    // Store only the most recent pick per user and day
     data?.forEach((entry) => {
       const key = `${entry.username}-${entry.tournament_day}`;
+      // Only store the most recent pick for each day
       if (!latestPicks[key]) {
         latestPicks[key] = entry;
       }
     });
 
-    console.log(latestPicks);  // Log to see the fetched data
-    setPicksTable(Object.values(latestPicks));  // Store the most recent pick per user and day
+    console.log("Fetched Picks (Most Recent Per Day):", latestPicks); // Log for debugging
+    setPicksTable(Object.values(latestPicks));  // Flatten to get an array of latest picks
   };
 
   const submitPick = async () => {
