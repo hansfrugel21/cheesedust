@@ -137,19 +137,20 @@ export default function Home() {
       .from("picks")
       .select("username, tournament_day, team_id, created_at, teams(team_name)")
       .order("created_at", { ascending: false })  // Order by created_at DESC, so most recent picks come first
-      .limit(2500);  // Adjust the limit to 2500
+      .limit(2500);  // Increase the limit to 2500
 
+    // Filter the picks to get only the latest pick for each user and tournament day
     const latestPicks = {};
 
-    // Store only the most recent pick for each user and day
     data?.forEach((entry) => {
-      const key = `${entry.username}-${entry.tournament_day}`;  // Unique key for user and day
-      if (!latestPicks[key]) {
+      const key = `${entry.username}-${entry.tournament_day}`;
+      // If the key doesn't exist or the pick is more recent, update it
+      if (!latestPicks[key] || new Date(entry.created_at) > new Date(latestPicks[key].created_at)) {
         latestPicks[key] = entry;
       }
     });
 
-    console.log("Fetched Picks (Most Recent Per Day):", latestPicks);  // Log for debugging
+    console.log("Latest Picks (Filtered by Tournament Day):", latestPicks);  // Log for debugging
     setPicksTable(Object.values(latestPicks));  // Convert map to array and store it
   };
 
