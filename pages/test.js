@@ -16,6 +16,7 @@ export default function Home() {
   const [gameStartedDays, setGameStartedDays] = useState({});
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Fetch initial data on page load
   useEffect(() => {
     fetchExistingUsers();
     fetchComments();
@@ -45,7 +46,7 @@ export default function Home() {
   const fetchExistingUsers = async () => {
     try {
       const { data } = await supabase.from("users").select("username, email");
-      setExistingUsers(data.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })));
+      setExistingUsers(data || []);
     } catch (error) {
       console.error("Error fetching users:", error);
     }
@@ -121,20 +122,24 @@ export default function Home() {
       setTeams([]);
       return;
     }
-    const { data: scheduleData } = await supabase
-      .from("team_schedule")
-      .select("team_id")
-      .eq("tournament_day", tournamentDay);
+    try {
+      const { data: scheduleData } = await supabase
+        .from("team_schedule")
+        .select("team_id")
+        .eq("tournament_day", tournamentDay);
 
-    if (scheduleData?.length) {
-      const teamIds = scheduleData.map((entry) => entry.team_id);
-      const { data: teamData } = await supabase
-        .from("teams")
-        .select("id, team_name")
-        .in("id", teamIds);
-      setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
-    } else {
-      setTeams([]);
+      if (scheduleData?.length) {
+        const teamIds = scheduleData.map((entry) => entry.team_id);
+        const { data: teamData } = await supabase
+          .from("teams")
+          .select("id, team_name")
+          .in("id", teamIds);
+        setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
+      } else {
+        setTeams([]);
+      }
+    } catch (error) {
+      console.error("Error fetching teams:", error);
     }
   };
 
