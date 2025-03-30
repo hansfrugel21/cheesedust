@@ -199,7 +199,7 @@ export default function Home() {
 
   return (
     <div style={{ background: "transparent", padding: "20px", fontFamily: "Arial, sans-serif", color: "#333" }}>
-      {/* Login and pick submission logic */}
+      {/* Add your remaining JSX, such as login form, comment form, and picks table */}
     </div>
   );
 }
