@@ -18,7 +18,6 @@ export default function Home() {
 
   // Fetch initial data on page load
   useEffect(() => {
-    // A wrapper function to ensure async behavior inside useEffect
     const fetchData = async () => {
       await fetchExistingUsers();
       await fetchComments();
@@ -27,7 +26,7 @@ export default function Home() {
     };
 
     fetchData();
-  }, []); // The empty dependency array ensures this runs once when the component mounts
+  }, []);
 
   const checkGameStatus = () => {
     const firstGameTimes = {
@@ -51,6 +50,7 @@ export default function Home() {
   const fetchExistingUsers = async () => {
     try {
       const { data } = await supabase.from("users").select("username, email");
+      console.log("Fetched Users:", data); // Debugging log to check the users fetched
       setExistingUsers(data || []);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -81,6 +81,7 @@ export default function Home() {
         .from("comments")
         .select("id, username, comment_text, created_at, parent_id")
         .order("created_at", { ascending: true });
+      console.log("Fetched Comments:", data); // Debugging log to check comments fetched
       setComments(data || []);
     } catch (error) {
       console.error("Error fetching comments:", error);
@@ -117,6 +118,7 @@ export default function Home() {
           .from("teams")
           .select("id, team_name")
           .in("id", teamIds);
+        console.log("Fetched Teams:", teamData); // Debugging log to check teams fetched
         setTeams(teamData.sort((a, b) => a.team_name.localeCompare(b.team_name, undefined, { sensitivity: 'base' })));
       } else {
         setTeams([]);
@@ -136,6 +138,7 @@ export default function Home() {
         .from("picks")
         .select("username, tournament_day, team_id, created_at, teams(team_name)")
         .order("created_at", { ascending: false }); // Order by creation time, descending
+      console.log("Fetched Picks:", data); // Debugging log to check the picks fetched
 
       const latestPicks = {};
 
