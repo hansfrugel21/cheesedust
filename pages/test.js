@@ -225,7 +225,7 @@ export default function Home() {
                 );
                 return (
                   <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
-                    {pickEntry ? pickEntry.team_name : "No pick"}
+                    {pickEntry ? pickEntry.teams.team_name : "No pick"}
                   </td>
                 );
               })}
