@@ -19,10 +19,13 @@ export default function Home() {
 
   useEffect(() => {
     fetchExistingUsers();
-    fetchSubmittedPicks();
     fetchComments();
     checkGameStatus();
   }, []);
+
+  useEffect(() => {
+    fetchTeamsForDay();
+  }, [tournamentDay]);
 
   const checkGameStatus = () => {
     const firstGameTimes = {
@@ -128,27 +131,23 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    fetchTeamsForDay();
-  }, [tournamentDay]);
-
   const fetchSubmittedPicks = async () => {
     const { data } = await supabase
       .from("picks")
-      .select("username, tournament_day, team_id, date, teams(team_name)")
-      .order("date", { ascending: false });  // Order by date DESC, so most recent picks come first
+      .select("username, tournament_day, team_id, date, teams(team_name), created_at")
+      .order("created_at", { ascending: false }); // Order by creation time, descending
 
     const latestPicks = {};
 
-    // Store only the most recent pick for each user and day
+    // Store only the most recent pick for each user and tournament day
     data?.forEach((entry) => {
-      const key = `${entry.username}-${entry.tournament_day}`;  // Unique key for user and day
-      if (!latestPicks[key]) {
+      const key = `${entry.username}-${entry.tournament_day}`;  // Unique key for user and tournament day
+      // If this is the first pick for this user and tournament day, or a more recent one, store it
+      if (!latestPicks[key] || new Date(entry.created_at) > new Date(latestPicks[key].created_at)) {
         latestPicks[key] = entry;
       }
     });
 
-    console.log("Fetched Picks (Most Recent Per Day):", latestPicks);  // Log for debugging
     setPicksTable(Object.values(latestPicks));  // Convert map to array and store it
   };
 
