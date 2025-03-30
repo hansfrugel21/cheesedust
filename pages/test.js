@@ -19,14 +19,10 @@ export default function Home() {
 
   useEffect(() => {
     fetchExistingUsers();
+    fetchSubmittedPicks();
     fetchComments();
     checkGameStatus();
   }, []);
-
-  useEffect(() => {
-    fetchTeamsForDay();
-    fetchSubmittedPicks();
-  }, [tournamentDay]);
 
   const checkGameStatus = () => {
     const firstGameTimes = {
@@ -131,6 +127,10 @@ export default function Home() {
       setTeams([]);
     }
   };
+
+  useEffect(() => {
+    fetchTeamsForDay();
+  }, [tournamentDay]);
 
   const fetchSubmittedPicks = async () => {
     const { data } = await supabase
@@ -244,7 +244,7 @@ export default function Home() {
                 return (
                   <td style={{ padding: "10px", border: "1px solid #ddd" }} key={day}>
                     {pickEntry ? (
-                      (gameStartedDays[day] || (isLoggedIn && currentUser?.username === user))
+                      gameStartedDays[day] || (isLoggedIn && currentUser?.username === user)
                         ? pickEntry.teams.team_name
                         : "Submitted"
                     ) : ""}
